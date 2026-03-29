@@ -1,4 +1,7 @@
 use std::fmt;
+use std::collections::HashMap;
+
+pub type TypeSubstitution = HashMap<usize, Types>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Types {
@@ -19,6 +22,28 @@ impl fmt::Display for Types {
             Types::List(t) => write!(f, "𝕃({})", t),
             Types::Arr(t, s) => write!(f, "({} ⇒ {})",t,s),
             Types::Pair(t, s) => write!(f, "{} × {}",t,s),
+        }
+    }
+}
+
+impl Types {
+    pub fn subst(&self, sigma: &TypeSubstitution) -> Types {
+        match self {
+            Types::TypeVar(xi) => {
+                match sigma.get(&xi) {
+                    Some(ty) => ty.clone(),
+                    None => self.clone(),
+                }
+            },
+            Types::Boolean => Types::Boolean,
+            Types::Nat => Types::Nat,
+            Types::List(t) => Types::List(Box::new(t.subst(sigma))),
+            Types::Arr(t, s) => {
+                Types::Arr(Box::new(t.subst(sigma)), Box::new(s.subst(sigma)))
+            }
+            Types::Pair(t, s) => {
+                Types::Pair(Box::new(t.subst(sigma)), Box::new(s.subst(sigma)))
+            }
         }
     }
 }

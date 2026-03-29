@@ -3,6 +3,7 @@
 mod types;
 mod terms;
 mod formulas;
+mod proofs;
 
 use std::fmt;
 use crate::types::Types;

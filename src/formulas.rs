@@ -1,6 +1,10 @@
+use std::collections::HashMap;
 use std::fmt;
-use crate::terms::{Const, ObjVar, Term};
+use crate::terms::{Const, ObjVar, Term, check_term_substitution};
 use crate::types::{TypeError, Types};
+
+pub type TypeSubstitution = HashMap<usize, Types>;
+pub type TermSubstitution = HashMap<ObjVar, Term>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Formula {
@@ -28,6 +32,9 @@ impl Formula {
         Formula::Bottom
     }
 
+    pub fn falsum() -> Self {Formula::Atom(Term::constant(Const::FF))}
+    pub fn verum() -> Self {Formula::Atom(Term::constant(Const::TT))}
+
     pub fn F(&self) -> Self {
         let F = Formula::Atom(Term::constant(Const::FF));
         match self {
@@ -36,6 +43,49 @@ impl Formula {
             Formula::Imp(a, b) =>  Formula::Imp(Box::new(a.F()), Box::new(b.F())),
             Formula::Forall(x, a) => Formula::Forall( x.clone(), Box::new(a.F()) ),
 
+        }
+    }
+    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Formula {
+        match self {
+            Formula::Atom(t) => Formula::Atom(t.subst_type(sigma)),
+
+            Formula::Imp(a, b) => Formula::Imp(
+                Box::new(a.subst_type(sigma)),
+                Box::new(b.subst_type(sigma)),
+            ),
+
+            Formula::Forall(v, f) => Formula::Forall(
+                v.subst_type(sigma),
+                Box::new(f.subst_type(sigma)),
+            ),
+
+            Formula::Bottom => Formula::Bottom,
+        }
+    }
+    pub fn subst(&self, sigma: &TermSubstitution) -> Result<Formula, TypeError> {
+        check_term_substitution(sigma)?;
+        Ok(self.subst_unchecked(sigma))
+    }
+    fn subst_unchecked(&self, sigma: &TermSubstitution) -> Formula {
+        match self {
+            Formula::Atom(t) => Formula::Atom(t.subst_unchecked(sigma)),
+
+            Formula::Imp(a, b) => Formula::Imp(
+                Box::new(a.subst_unchecked(sigma)),
+                Box::new(b.subst_unchecked(sigma)),
+            ),
+
+            Formula::Forall(bound, body) => {
+                let mut restricted = sigma.clone();
+                restricted.remove(bound);
+
+                Formula::Forall(
+                    bound.clone(),
+                    Box::new(body.subst_unchecked(&restricted)),
+                )
+            }
+
+            Formula::Bottom => Formula::Bottom,
         }
     }
 }
@@ -59,3 +109,4 @@ pub fn isQFree(formula: &Formula) -> bool {
         Formula::Imp(g, h) => isQFree(&g) && isQFree(&h),
     }
 }
+
