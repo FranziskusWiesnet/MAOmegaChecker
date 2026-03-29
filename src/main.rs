@@ -12,6 +12,10 @@ use crate::terms::Const;
 use crate::formulas::{Formula, isQFree};
 use crate::types::Types::TypeVar;
 
+fn setPrint(formula: &Formula) -> bool {
+    println!("{}", formula);
+    true
+}
 fn setD(formula: &Formula) -> bool {
     match formula {
         Formula::Bottom => true,
@@ -21,10 +25,6 @@ fn setD(formula: &Formula) -> bool {
     }
 }
 
-fn setPrint(formula: &Formula) -> bool {
-    println!("{}", formula);
-    true
-}
 fn setG(formula: &Formula) -> bool {
     match formula {
         Formula::Bottom => true,
@@ -40,7 +40,7 @@ fn setG(formula: &Formula) -> bool {
 fn setR(formula: &Formula) -> bool {
     match formula {
         Formula::Bottom => false,
-        Formula::Atom(n) => true,
+        Formula::Atom(_) => true,
         Formula::Forall(_, A) => setR(A),
         Formula::Imp(A, B) => setG(A) && setR(B),
     }
@@ -48,7 +48,7 @@ fn setR(formula: &Formula) -> bool {
 fn setI(formula: &Formula) -> bool {
     match formula {
         Formula::Bottom => false,
-        Formula::Atom(n) => true,
+        Formula::Atom(_) => true,
         Formula::Forall(_, A) => setI(A),
         Formula::Imp(A, B) => setD(A) && setI(B),
     }
@@ -65,7 +65,7 @@ fn all(x: &ObjVar, a: &Formula) -> Formula {
 fn main() {
     let bot = Formula::Bottom;
     let F = Formula::Atom(Term::constant(Const::FF));
-    let A: Formula =  Formula::Atom(Term::var(&ObjVar::new(1, Types::Boolean)));
+    let A: Formula =  Formula::Atom(Term::var(&ObjVar::new(0, Types::Boolean)));
     let xi = TypeVar(0);
     let x = ObjVar::new(0,xi);
     let S = all(&x, &imp(&imp(&imp(&A,&F),&F),&A));
@@ -75,6 +75,7 @@ fn main() {
     //println!("{}", imp(&T.F(),&T));
     println!("{StoT}");
     println!("{}", setD(&StoT));
-    println!("{}", setD(&imp(&imp(&A,&bot),&bot)));
-    println!("{}", x);
+    let B = imp(&imp(&A,&bot),&bot);
+    println!("{B}");
+    println!("{}", setG(&B));
 }
