@@ -39,8 +39,26 @@ impl Axiom  {
                 let form_ff = &form.subst(&sigma)?;
                 Ok(Formula::forall(b,&imp(&form_tt,&imp(&form_ff,&form))))
             }
-            Axiom::IndNat(_, _) => {}
-            Axiom::IndList(_, _) => {}
+            Axiom::IndNat(n, form) => {
+                if *n.ty() != Types::Nat {
+                    return Err(TypeError::Mismatch {
+                        expected: Types::Nat,
+                        found: n.ty().clone(),})
+                }
+                let sigma = HashMap::from([
+                    (n.clone(), Term::constant(Const::Zero))
+                ]);
+                let form_zero = &form.subst(&sigma)?;
+                let sigma = HashMap::from([
+                    (n.clone(), Term::app(&Term::constant(Const::Succ), &Term::var(&n))?)
+                ]);
+                let form_succ = &form.subst(&sigma)?;
+                Ok(Formula::forall(n,
+                                   &imp(form_zero,
+                                        &imp(&Formula::forall(n,&imp(form,form_succ)),
+                                        form))))
+            }
+            Axiom::IndList(l, a) => {todo!()}
         }
     }
 }
