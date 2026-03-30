@@ -1,12 +1,13 @@
 use std::fmt;
 use crate::types::Types;
 use crate::types::TypeError;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 
 
 pub type TypeSubstitution = HashMap<usize, Types>;
 pub type TermSubstitution = HashMap<ObjVar, Term>;
+pub type TermKindSubstitution = HashMap<ObjVar, TermKind>;
 
 #[derive(Debug, Clone)]
 pub struct ObjVar {
@@ -20,9 +21,7 @@ impl PartialEq for ObjVar {
         self.id == other.id && self.ty == other.ty
     }
 }
-
 impl Eq for ObjVar {}
-
 impl Hash for ObjVar {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state);
@@ -61,6 +60,9 @@ impl ObjVar {
             ty,
             name: Some(name.into()),
         }
+    }
+    pub fn free_type_var(&self) -> HashSet<usize> {
+        self.ty.free_var()
     }
     pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
         Self {
@@ -165,6 +167,34 @@ impl Const {
             ),
         }
     }
+    pub fn free_type_var(&self) -> HashSet<usize> {
+        match self {
+            Const::TT => {HashSet::new()},
+            Const::FF => {HashSet::new()},
+            Const::Zero => {HashSet::new()},
+            Const::Succ => {HashSet::new()},
+            Const::Nil(ty) => {ty.free_var()}
+            Const::Cons(ty) => {ty.free_var()}
+            Const::Pair(ty1, ty2) => {
+                let mut a = ty1.free_var();
+                a.extend(ty2.free_var());
+                a
+            }
+            Const::Split(ty1, ty2, ty3) => {
+                let mut a = ty1.free_var();
+                a.extend(ty2.free_var());
+                a.extend(ty3.free_var());
+                a
+            }
+            Const::Cases(ty) => {ty.free_var()}
+            Const::RecNat(ty) => {ty.free_var()}
+            Const::RecList(ty1, ty2) => {
+                let mut a = ty1.free_var();
+                a.extend(ty2.free_var());
+                a
+            }
+        }
+    }
     pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
         match self {
             Const::TT => Const::TT,
@@ -193,9 +223,87 @@ impl Const {
 pub enum TermKind {
     TermVar(ObjVar),
     TermConst(Const),
-    TermApp(Box<Term>, Box<Term>),
-    TermAbs(ObjVar, Box<Term>),
+    TermApp(Box<TermKind>, Box<TermKind>),
+    TermAbs(ObjVar, Box<TermKind>),
 }
+
+impl TermKind {
+    pub fn free_type_var(&self) -> HashSet<usize> {
+        match self {
+            TermKind::TermVar(u) => u.free_type_var(),
+            TermKind::TermConst(c) => c.free_type_var(),
+            TermKind::TermApp(a, b) => {
+                let mut h = a.free_type_var();
+                h.extend(b.free_type_var());
+                h
+            }
+            TermKind::TermAbs(x, a) => {
+                let mut h = x.free_type_var();
+                h.extend(a.free_type_var());
+                h
+            }
+        }
+    }
+    pub fn free_var(&self) -> HashSet<ObjVar> {
+        match self {
+            TermKind::TermVar(u) => [u.clone()].into_iter().collect(),
+            TermKind::TermConst(_) => {
+                HashSet::new()
+            }
+            TermKind::TermApp(s, t) => {
+                let mut a = s.free_var();
+                a.extend(t.free_var());
+                a
+
+            }
+            TermKind::TermAbs(x, t) => {
+                let mut a = t.free_var();
+                a.remove(x);
+                a
+            }
+        }
+    }
+    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
+        match self {
+            TermKind::TermVar(v) => TermKind::TermVar(v.subst_type(sigma)),
+            TermKind::TermConst(c) => TermKind::TermConst(c.subst_type(sigma)),
+            TermKind::TermApp(fun, arg) => {
+                let a = *fun.clone();
+                TermKind::TermApp(
+                    Box::new(fun.subst_type(sigma)),
+                    Box::new(arg.subst_type(sigma)),
+                )
+            }
+            TermKind::TermAbs(v, body) => {
+                TermKind::TermAbs(
+                    v.subst_type(sigma),
+                    Box::new(body.subst_type(sigma)),
+                )
+            }
+        }
+    }
+
+    pub fn subst(&self, sigma: &TermKindSubstitution) -> Self {
+        match self {
+            TermKind::TermVar(v) => match sigma.get(v) {
+                Some(t) => t.clone(),
+                None => self.clone(),
+            }
+            TermKind::TermConst(_) => self.clone(),
+            TermKind::TermApp(fun, arg) =>
+                    TermKind::TermApp(
+                    Box::new(fun.subst(sigma)),
+                    Box::new(arg.subst(sigma))),
+            TermKind::TermAbs(var, body) => {
+                let mut restricted_sigma = sigma.clone();
+                restricted_sigma.remove(var);
+                TermKind::TermAbs(
+                        var.clone(),
+                        Box::new(body.subst(&restricted_sigma)))
+                }
+            }
+        }
+    }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Term {
@@ -205,6 +313,47 @@ pub struct Term {
 
 
 impl Term {
+    pub fn from_kind(kind: &TermKind) -> Result<Self, TypeError> {
+        match kind {
+            TermKind::TermVar(v) => Ok(Self {
+                ty: v.ty().clone(),
+                kind: kind.clone(),
+            }),
+            TermKind::TermConst(c) => Ok(Self {
+                ty: c.ty().clone(),
+                kind: kind.clone(),
+            }),
+            TermKind::TermAbs(x, a) => {
+                let body_term = Term::from_kind(a)?;
+                Ok(Self{
+                    ty: Types::Arr(
+                        Box::new(x.ty().clone()),
+                        Box::new(body_term.ty.clone())),
+                    kind: kind.clone(),
+                })
+            }
+            TermKind::TermApp(a, b) => {
+                let fun_term = Term::from_kind(a)?;
+                let arg_term = Term::from_kind(b)?;
+                match fun_term.ty() {
+                    Types::Arr(dom, img) => {
+                        if **dom != arg_term.ty {
+                            Err(TypeError::Mismatch {
+                                expected: (**dom).clone(),
+                                found: arg_term.ty.clone(),
+                            })
+                        } else {
+                            Ok(Self {
+                                ty: (**img).clone(),
+                                kind: kind.clone(),
+                            })
+                        }
+                    }
+                    other => Err(TypeError::ExpectedFunction(other.clone())),
+                }
+            }
+        }
+    }
     pub fn ty(&self) -> &Types {
         &self.ty
     }
@@ -221,11 +370,13 @@ impl Term {
             kind: TermKind::TermConst(c),
         }
     }
-
+    pub fn free_var(&self) -> HashSet<ObjVar> {
+        self.kind.free_var()
+    }
     pub fn abs(var: &ObjVar, t: &Term) -> Self {
         Self{
             ty: Types::Arr(Box::new(var.ty.clone()), Box::new(t.ty.clone())),
-            kind: TermKind::TermAbs(var.clone(), Box::new(t.clone())),
+            kind: TermKind::TermAbs(var.clone(), Box::new(t.kind.clone())),
         }
     }
     pub fn app(fun: &Term, arg: &Term) -> Result<Self, TypeError> {
@@ -240,7 +391,7 @@ impl Term {
                 else {
                     Ok(Self{
                         ty: (**codom).clone(),
-                        kind: TermKind::TermApp(Box::new(fun.clone()), Box::new(arg.clone())),
+                        kind: TermKind::TermApp(Box::new(fun.kind.clone()), Box::new(arg.kind.clone())),
                     })
                 }
             }
@@ -249,26 +400,9 @@ impl Term {
     }
 
     pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
-        let new_kind = match &self.kind {
-            TermKind::TermVar(v) => TermKind::TermVar(v.subst_type(sigma)),
-            TermKind::TermConst(c) => TermKind::TermConst(c.subst_type(sigma)),
-            TermKind::TermApp(fun, arg) => {
-                TermKind::TermApp(
-                    Box::new(fun.subst_type(sigma)),
-                    Box::new(arg.subst_type(sigma)),
-                )
-            }
-            TermKind::TermAbs(v, body) => {
-                TermKind::TermAbs(
-                    v.subst_type(sigma),
-                    Box::new(body.subst_type(sigma)),
-                )
-            }
-        };
-
         Self {
             ty: self.ty.subst(sigma),
-            kind: new_kind,
+            kind: self.kind.subst_type(sigma),
         }
     }
     pub fn subst(&self, sigma: &TermSubstitution) -> Result<Term, TypeError> {
@@ -277,31 +411,7 @@ impl Term {
     }
 
     pub fn subst_unchecked(&self, sigma: &TermSubstitution) -> Self {
-        match &self.kind {
-            TermKind::TermVar(v) => match sigma.get(v) {
-                Some(t) => t.clone(),
-                None => self.clone(),
-            }
-            TermKind::TermConst(_) => self.clone(),
-            TermKind::TermApp(fun, arg) => Term {
-                ty: self.ty.clone(),
-                kind: TermKind::TermApp(
-                    Box::new(fun.subst_unchecked(sigma)),
-                    Box::new(arg.subst_unchecked(sigma)),
-                ),
-            },
-            TermKind::TermAbs(var, body) => {
-                let mut restricted_sigma = sigma.clone();
-                restricted_sigma.remove(var);
-                Term {
-                    ty: self.ty.clone(),
-                    kind: TermKind::TermAbs(
-                        var.clone(),
-                        Box::new(body.subst_unchecked(&restricted_sigma)),
-                    ),
-                }
-            }
-        }
+            todo!()
     }
 }
 
@@ -327,8 +437,9 @@ impl fmt::Display for Term {
         match &self.kind {
             TermKind::TermVar(v) => write!(f, "{v}"),
             TermKind::TermConst(c) => write!(f, "{c}"),
-            TermKind::TermApp(fun, arg) => write!(f, "({} {})", fun, arg),
-            TermKind::TermAbs(v, body) => write!(f, "(λ{}. {})", v, body),
+            _ => todo!()
+            //TermKind::TermApp(fun, arg) => write!(f, "({} {})", fun, arg),
+            //TermKind::TermAbs(v, body) => write!(f, "(λ{}. {})", v, body),
         }
     }
 }

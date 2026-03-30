@@ -1,5 +1,5 @@
 use std::fmt;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub type TypeSubstitution = HashMap<usize, Types>;
 
@@ -46,6 +46,26 @@ impl Types {
             }
         }
     }
+    pub fn free_var(&self) -> HashSet<usize> {
+        match self {
+            Types::TypeVar(n) => {
+                HashSet::from_iter(vec![n.clone()])
+            }
+            Types::Boolean => HashSet::new(),
+            Types::Nat => HashSet::new(),
+            Types::List(ty) => ty.free_var(),
+            Types::Arr(ty1, ty2) => {
+                let mut a = ty1.free_var();
+                a.extend(ty2.free_var());   
+                a
+            }
+            Types::Pair(ty1, ty2) => {
+                let mut a = ty1.free_var();
+                a.extend(ty2.free_var());
+                a
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -53,4 +73,5 @@ pub enum TypeError {
     Mismatch {expected: Types, found: Types },
     ExpectedFunction(Types),
     ExpectedBoolean(Types),
+    ExpectedList(Types),
 }
