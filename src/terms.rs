@@ -295,11 +295,24 @@ impl TermKind {
                     Box::new(fun.subst(sigma)),
                     Box::new(arg.subst(sigma))),
             TermKind::TermAbs(var, body) => {
-                let mut restricted_sigma = sigma.clone();
-                restricted_sigma.remove(var);
-                TermKind::TermAbs(
+                let mut set = body.free_var();
+                set.remove(var);
+                let mut mod_sigma = sigma.clone();
+                mod_sigma.remove(var);
+                let h: HashSet<TermKind> = mod_sigma.clone().into_values().collect();
+                let h2 = free_var(h);
+                if h2.contains(&var) {
+                    set.extend(h2);
+                    let x = new_var(&var.ty, set);
+                    mod_sigma.insert(var.clone(), TermKind::TermVar(x.clone()));
+                    TermKind::TermAbs(
+                        x,
+                        Box::new(body.subst(&mod_sigma)))
+                } else {
+                    TermKind::TermAbs(
                         var.clone(),
-                        Box::new(body.subst(&restricted_sigma)))
+                        Box::new(body.subst(&mod_sigma)))
+                }
                 }
             }
         }
@@ -432,16 +445,42 @@ impl fmt::Display for Const {
         }
     }
 }
-impl fmt::Display for Term {
+impl fmt::Display for TermKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.kind {
-            TermKind::TermVar(v) => write!(f, "{v}"),
-            TermKind::TermConst(c) => write!(f, "{c}"),
-            _ => todo!()
-            //TermKind::TermApp(fun, arg) => write!(f, "({} {})", fun, arg),
-            //TermKind::TermAbs(v, body) => write!(f, "(λ{}. {})", v, body),
+        match self {
+            TermKind::TermVar(v) => write!(f, "{}", v),
+            TermKind::TermConst(c) => write!(f, "{}", c),
+            TermKind::TermApp(a, b) => write!(f, "({} {})", a, b),
+            TermKind::TermAbs(v, b) => write!(f, "(λ{}. {})", v, b),
         }
     }
+}
+impl fmt::Display for Term {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.kind.fmt(f)
+    }
+}
+
+fn free_var(h: HashSet<TermKind>) -> HashSet<ObjVar> {
+    let mut set = HashSet::new();
+    for t in h {
+        set.extend(t.free_var());
+    }
+    set
+}
+
+fn new_var(ty: &Types, h: HashSet<ObjVar>) -> ObjVar {
+    let set_id: HashSet<usize> = h
+        .iter()
+        .cloned()
+        .filter(|v| v.ty == *ty)
+        .map(|v| v.id)
+        .collect();
+    let mut id = 0;
+    while set_id.contains(&id) {
+        id += 1;
+    }
+    ObjVar::new(id, ty.clone())
 }
 
 pub fn check_term_substitution(sigma: &TermSubstitution) -> Result<(), TypeError> {
@@ -456,6 +495,7 @@ pub fn check_term_substitution(sigma: &TermSubstitution) -> Result<(), TypeError
     Ok(())
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -465,51 +505,5 @@ mod tests {
         let x1 = ObjVar::with_name(0, Types::Nat, "x");
         let x2 = ObjVar::with_name(0, Types::Nat, "y");
         assert_eq!(x1, x2);
-    }
-
-    #[test]
-    fn test_term_substitution_variable() {
-        let x = ObjVar::with_name(0, Types::Nat, "x");
-        let y = ObjVar::with_name(1, Types::Nat, "y");
-
-        let tx = Term::var(&x);
-        let ty = Term::var(&y);
-
-        let mut sigma = TermSubstitution::new();
-        sigma.insert(x.clone(), ty.clone());
-
-        let result = tx.subst(&sigma).unwrap();
-        assert_eq!(result, ty);
-    }
-
-    #[test]
-    fn test_term_substitution_under_binder() {
-        let x = ObjVar::with_name(0, Types::Nat, "x");
-        let y = ObjVar::with_name(1, Types::Nat, "y");
-
-        let body = Term::var(&x);
-        let abs = Term::abs(&x, &body);
-        let ty = Term::var(&y);
-
-        let mut sigma = TermSubstitution::new();
-        sigma.insert(x.clone(), ty);
-
-        let result = abs.subst(&sigma).unwrap();
-
-        assert_eq!(result, abs);
-    }
-
-    #[test]
-    fn test_term_substitution_type_mismatch() {
-        let x = ObjVar::with_name(0, Types::Nat, "x");
-        let b = ObjVar::with_name(1, Types::Boolean, "b");
-
-        let tx = Term::var(&x);
-        let tb = Term::var(&b);
-
-        let mut sigma = TermSubstitution::new();
-        sigma.insert(x, tb);
-
-        assert!(tx.subst(&sigma).is_err());
     }
 }

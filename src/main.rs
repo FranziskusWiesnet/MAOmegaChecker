@@ -9,9 +9,12 @@ use std::fmt;
 use crate::types::Types;
 use crate::terms::ObjVar;
 use crate::terms::Term;
+use crate::terms::{TermKind, TermKindSubstitution};
 use crate::terms::Const;
 use crate::formulas::{Formula, isQFree};
 use crate::types::Types::TypeVar;
+use std::collections::HashMap;
+
 
 fn setPrint(formula: &Formula) -> bool {
     println!("{}", formula);
@@ -79,4 +82,27 @@ fn main() {
     let B = imp(&imp(&A,&bot),&bot);
     println!("{B}");
     println!("{}", setG(&B));
+    println!("{}", setD(&B));
+
+    let x = ObjVar::new(0, Types::Boolean);
+    let y = ObjVar::new(1, Types::Boolean);
+    let z = ObjVar::new(2, Types::Boolean);
+    let x = ObjVar::with_name(0, Types::Boolean, "x");
+    let y = ObjVar::with_name(1, Types::Boolean, "y");
+
+    let t = TermKind::TermAbs(
+        y.clone(),
+        Box::new(TermKind::TermVar(x.clone())),
+    );
+
+    let mut sigma: TermKindSubstitution = HashMap::new();
+    sigma.insert(x.clone(), TermKind::TermVar(y.clone()));
+
+    println!("t     = {}", t);
+    for (v, s) in &sigma {
+        println!("sigma = {} ↦ {}", v, s);
+    }
+
+    let result = t.subst(&sigma);
+    println!("tσ    = {}", result);
 }

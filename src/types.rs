@@ -70,7 +70,7 @@ impl Types {
 
 #[derive(Debug, Clone)]
 pub enum TypeError {
-    Mismatch {expected: Types, found: Types },
+    Mismatch {expected: Types, found: Types},
     ExpectedFunction(Types),
     ExpectedBoolean(Types),
     ExpectedList(Types),
