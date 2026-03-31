@@ -3,11 +3,9 @@ use crate::types::Types;
 use crate::types::TypeError;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-
-
 pub type TypeSubstitution = HashMap<usize, Types>;
-pub type TermSubstitution = HashMap<ObjVar, Term>;
 pub type TermKindSubstitution = HashMap<ObjVar, TermKind>;
+pub type TermSubstitution = HashMap<ObjVar, Term>;
 
 #[derive(Debug, Clone)]
 pub struct ObjVar {
@@ -15,7 +13,6 @@ pub struct ObjVar {
     ty: Types,
     name: Option<String>
 }
-
 impl PartialEq for ObjVar {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id && self.ty == other.ty
@@ -28,7 +25,6 @@ impl Hash for ObjVar {
         self.ty.hash(state);
     }
 }
-
 impl fmt::Display for ObjVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.name {
@@ -37,23 +33,19 @@ impl fmt::Display for ObjVar {
         }
     }
 }
-
 impl ObjVar {
     pub fn id(&self) -> usize {
         self.id
     }
-
     pub fn ty(&self) -> &Types {
         &self.ty
     }
-
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
     pub fn new(id: usize, ty: Types) -> Self {
         Self { id, ty, name: None }
     }
-
     pub fn with_name(id: usize, ty: Types, name: impl Into<String>) -> Self {
         Self {
             id,
@@ -61,8 +53,8 @@ impl ObjVar {
             name: Some(name.into()),
         }
     }
-    pub fn free_type_var(&self) -> HashSet<usize> {
-        self.ty.free_var()
+    pub fn free_type_vars(&self) -> HashSet<usize> {
+        self.ty.free_vars()
     }
     pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
         Self {
@@ -167,30 +159,30 @@ impl Const {
             ),
         }
     }
-    pub fn free_type_var(&self) -> HashSet<usize> {
+    pub fn free_type_vars(&self) -> HashSet<usize> {
         match self {
             Const::TT => {HashSet::new()},
             Const::FF => {HashSet::new()},
             Const::Zero => {HashSet::new()},
             Const::Succ => {HashSet::new()},
-            Const::Nil(ty) => {ty.free_var()}
-            Const::Cons(ty) => {ty.free_var()}
+            Const::Nil(ty) => {ty.free_vars()}
+            Const::Cons(ty) => {ty.free_vars()}
             Const::Pair(ty1, ty2) => {
-                let mut a = ty1.free_var();
-                a.extend(ty2.free_var());
+                let mut a = ty1.free_vars();
+                a.extend(ty2.free_vars());
                 a
             }
             Const::Split(ty1, ty2, ty3) => {
-                let mut a = ty1.free_var();
-                a.extend(ty2.free_var());
-                a.extend(ty3.free_var());
+                let mut a = ty1.free_vars();
+                a.extend(ty2.free_vars());
+                a.extend(ty3.free_vars());
                 a
             }
-            Const::Cases(ty) => {ty.free_var()}
-            Const::RecNat(ty) => {ty.free_var()}
+            Const::Cases(ty) => {ty.free_vars()}
+            Const::RecNat(ty) => {ty.free_vars()}
             Const::RecList(ty1, ty2) => {
-                let mut a = ty1.free_var();
-                a.extend(ty2.free_var());
+                let mut a = ty1.free_vars();
+                a.extend(ty2.free_vars());
                 a
             }
         }
@@ -228,18 +220,18 @@ pub enum TermKind {
 }
 
 impl TermKind {
-    pub fn free_type_var(&self) -> HashSet<usize> {
+    pub fn free_type_vars(&self) -> HashSet<usize> {
         match self {
-            TermKind::TermVar(u) => u.free_type_var(),
-            TermKind::TermConst(c) => c.free_type_var(),
+            TermKind::TermVar(u) => u.free_type_vars(),
+            TermKind::TermConst(c) => c.free_type_vars(),
             TermKind::TermApp(a, b) => {
-                let mut h = a.free_type_var();
-                h.extend(b.free_type_var());
+                let mut h = a.free_type_vars();
+                h.extend(b.free_type_vars());
                 h
             }
             TermKind::TermAbs(x, a) => {
-                let mut h = x.free_type_var();
-                h.extend(a.free_type_var());
+                let mut h = x.free_type_vars();
+                h.extend(a.free_type_vars());
                 h
             }
         }
