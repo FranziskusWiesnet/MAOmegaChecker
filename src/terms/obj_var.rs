@@ -73,3 +73,106 @@ pub fn new_var(ty: &Types, h: HashSet<ObjVar>) -> ObjVar {
     }
     ObjVar::new(id, ty.clone())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::Types;
+    use std::collections::{HashMap, HashSet};
+    #[test]
+    fn equality_ignores_names() {
+        let x = ObjVar::with_name(0, Types::Nat, "x");
+        let y = ObjVar::with_name(0, Types::Nat, "y");
+
+        assert_eq!(x, y)
+    }
+    #[test]
+    fn equal_objvars_have_equal_hash() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let x = ObjVar::with_name(0, Types::Nat, "x");
+        let y = ObjVar::with_name(0, Types::Nat, "y");
+
+        let mut hx = DefaultHasher::new();
+        x.hash(&mut hx);
+
+        let mut hy = DefaultHasher::new();
+        y.hash(&mut hy);
+
+        assert_eq!(hx.finish(), hy.finish());
+    }
+    #[test]
+    fn hashset_identifies_objvars_with_same_id_and_type() {
+        let x = ObjVar::with_name(0, Types::Nat, "x");
+        let y = ObjVar::with_name(0, Types::Nat, "y");
+
+        let mut set = HashSet::new();
+        set.insert(x);
+        set.insert(y);
+
+        assert_eq!(set.len(), 1);
+    }
+    #[test]
+    fn objvars_with_same_id_but_different_type_are_different() {
+        let x = ObjVar::with_name(0, Types::Nat, "x");
+        let y = ObjVar::with_name(0, Types::Boolean, "x");
+
+        assert_ne!(x, y);
+    }
+    #[test]
+    fn free_type_vars_of_ground_typed_variable_is_empty() {
+        let x = ObjVar::with_name(0, Types::Nat, "x");
+
+        assert_eq!(x.free_type_vars(), HashSet::new());
+    }
+    #[test]
+    fn free_type_vars_of_variable_collects_type_variables() {
+        let ty = Types::arr(
+            Types::TypeVar(0),
+            Types::pair(Types::TypeVar(1), Types::list(Types::TypeVar(0))));
+        let x = ObjVar::with_name(0, ty, "x");
+
+        assert_eq!(x.free_type_vars(), HashSet::from([0, 1]));
+    }
+    #[test]
+    fn subst_type_replaces_type_variables_in_objvar_type() {
+        let x = ObjVar::with_name(0,
+                                  Types::arr(Types::TypeVar(0),Types::list(Types::TypeVar(1))),
+                                  "x");
+
+        let sigma: TypeSubstitution = HashMap::from([
+            (0, Types::Nat),
+            (1, Types::Boolean)]);
+
+        let expected = ObjVar::with_name(
+            0, Types::arr(Types::Nat, Types::list(Types::Boolean)),"x");
+
+        assert_eq!(x.subst_type(&sigma), expected);
+    }
+    #[test]
+    fn new_var_chooses_smallest_fresh_id_of_given_type() {
+        let x0 = ObjVar::new(0, Types::Nat);
+        let x1 = ObjVar::new(1, Types::Nat);
+        let x3 = ObjVar::new(3, Types::Nat);
+
+        let h = HashSet::from([x0, x1, x3]);
+
+        let fresh = new_var(&Types::Nat, h);
+
+        assert_eq!(fresh, ObjVar::new(2, Types::Nat));
+    }
+    #[test]
+    fn new_var_ignores_variables_of_other_types() {
+        let n0 = ObjVar::new(0, Types::Nat);
+        let b0 = ObjVar::new(0, Types::Boolean);
+        let b1 = ObjVar::new(1, Types::Boolean);
+
+        let h = HashSet::from([n0, b0, b1]);
+
+        let fresh = new_var(&Types::Nat, h);
+
+        assert_eq!(fresh, ObjVar::new(1, Types::Nat));
+    }
+
+}

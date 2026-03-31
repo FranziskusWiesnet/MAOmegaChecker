@@ -131,3 +131,72 @@ impl Const {
     }
 
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::Types;
+    use std::collections::{HashMap, HashSet};
+    #[test]
+    fn ty_of_basic_constants() {
+        assert_eq!(Const::TT.ty(), Types::Boolean);
+        assert_eq!(Const::FF.ty(), Types::Boolean);
+        assert_eq!(Const::Zero.ty(), Types::Nat);
+        assert_eq!(Const::Succ.ty(), Types::arr(Types::Nat, Types::Nat));
+    }
+    #[test]
+    fn ty_of_nil_and_cons() {
+        let alpha = Types::TypeVar(0);
+
+        assert_eq!(Const::Nil(alpha.clone()).ty(), Types::list(alpha.clone()));
+
+        assert_eq!(
+            Const::Cons(alpha.clone()).ty(),
+            Types::arr(
+                alpha.clone(),
+                Types::arr(Types::list(alpha.clone()), Types::list(alpha.clone()))
+            )
+        );
+    }
+    #[test]
+    fn ty_of_pair() {
+        let alpha = Types::TypeVar(0);
+        let beta = Types::TypeVar(1);
+
+        assert_eq!(
+            Const::Pair(alpha.clone(), beta.clone()).ty(),
+            Types::arr(
+                alpha.clone(),
+                Types::arr(beta.clone(), Types::pair(alpha.clone(), beta.clone()))
+            )
+        );
+    }
+    #[test]
+    fn free_type_vars_of_split() {
+        let c = Const::Split(
+            Types::TypeVar(0),
+            Types::TypeVar(1),
+            Types::TypeVar(2),
+        );
+
+        let expected: HashSet<usize> = HashSet::from([0, 1, 2]);
+        assert_eq!(c.free_type_vars(), expected);
+    }
+    #[test]
+    fn subst_type_on_nil() {
+        let c = Const::Nil(Types::TypeVar(0));
+        let sigma: TypeSubstitution = HashMap::from([
+            (0, Types::Nat),
+        ]);
+
+        assert_eq!(c.subst_type(&sigma), Const::Nil(Types::Nat));
+    }
+    #[test]
+    fn subst_type_does_nothing_on_closed_constants() {
+        let c = Const::Succ;
+        let sigma: TypeSubstitution = HashMap::from([
+            (0, Types::Nat),
+        ]);
+
+        assert_eq!(c.subst_type(&sigma), Const::Succ);
+    }
+}

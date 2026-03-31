@@ -4,7 +4,6 @@ mod formulas;
 mod proofs;
 mod terms;
 
-use std::fmt;
 use crate::types::Types;
 use crate::terms::obj_var::ObjVar;
 use crate::terms::Term;

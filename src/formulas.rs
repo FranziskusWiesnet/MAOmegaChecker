@@ -13,7 +13,20 @@ pub enum Formula {
     Forall(ObjVar, Box<Formula>),
     Bottom,
 }
-
+impl fmt::Display for Formula {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Formula::Bottom => write!(f, "⊥"),
+            Formula::Atom(t) => {
+                if *t == Term::constant(Const::FF) {
+                    write!(f, "F")
+                } else {
+                    write!(f, "{}",t)}},
+            Formula::Imp(a, b) => write!(f, "({} -> {})", a, b),
+            Formula::Forall(x, a) => write!(f, "(∀ x{}. {})", x, a),
+        }
+    }
+}
 impl Formula {
     pub fn atom(t: &Term) -> Result<Self, TypeError> {
         if *t.ty() != Types::Boolean {
@@ -90,16 +103,6 @@ impl Formula {
     }
 }
 
-impl fmt::Display for Formula {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Formula::Bottom => write!(f, "⊥"),
-            Formula::Atom(t) => {if *t == Term::constant(Const::FF) {write!(f, "F")} else {write!(f, "{}",t)}},
-            Formula::Imp(a, b) => write!(f, "({} -> {})", a, b),
-            Formula::Forall(x, a) => write!(f, "(∀ x{}. {})", x, a),
-        }
-    }
-}
 
 pub fn isQFree(formula: &Formula) -> bool {
     match formula {
