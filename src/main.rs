@@ -1,13 +1,12 @@
 #![allow(non_snake_case)]
-
 mod types;
-mod terms;
 mod formulas;
 mod proofs;
+mod terms;
 
 use std::fmt;
 use crate::types::Types;
-use crate::terms::ObjVar;
+use crate::terms::obj_var::ObjVar;
 use crate::terms::Term;
 use crate::terms::{TermKind, TermKindSubstitution};
 use crate::terms::Const;
@@ -90,13 +89,13 @@ fn main() {
     let x = ObjVar::with_name(0, Types::Boolean, "x");
     let y = ObjVar::with_name(1, Types::Boolean, "y");
 
-    let t = TermKind::TermAbs(
+    let t = TermKind::abs(
         y.clone(),
-        Box::new(TermKind::TermVar(x.clone())),
+        TermKind::Var(x.clone()),
     );
 
     let mut sigma: TermKindSubstitution = HashMap::new();
-    sigma.insert(x.clone(), TermKind::TermVar(y.clone()));
+    sigma.insert(x.clone(), TermKind::Var(y.clone()));
 
     println!("t     = {}", t);
     for (v, s) in &sigma {

@@ -68,7 +68,7 @@ impl Formula {
     }
     fn subst_unchecked(&self, sigma: &TermSubstitution) -> Formula {
         match self {
-            Formula::Atom(t) => Formula::Atom(t.subst_unchecked(sigma)),
+            Formula::Atom(t) => Formula::Atom(t.subst(sigma).unwrap()),
 
             Formula::Imp(a, b) => Formula::Imp(
                 Box::new(a.subst_unchecked(sigma)),
