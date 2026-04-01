@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![allow(dead_code)]
 mod types;
 mod formulas;
 mod proofs;
@@ -82,9 +83,9 @@ fn main() {
     println!("{}", setG(&B));
     println!("{}", setD(&B));
 
-    let x = ObjVar::new(0, Types::Boolean);
-    let y = ObjVar::new(1, Types::Boolean);
-    let z = ObjVar::new(2, Types::Boolean);
+    let _x = ObjVar::new(0, Types::Boolean);
+    let _y = ObjVar::new(1, Types::Boolean);
+    let _z = ObjVar::new(2, Types::Boolean);
     let x = ObjVar::with_name(0, Types::Boolean, "x");
     let y = ObjVar::with_name(1, Types::Boolean, "y");
 

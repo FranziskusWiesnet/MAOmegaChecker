@@ -3,6 +3,7 @@ use std::fmt;
 use crate::types::TypeSubstitution;
 use crate::terms::ObjVar;
 use crate::terms::Const;
+use crate::terms::new_var;
 pub type TermKindSubstitution = HashMap<ObjVar, TermKind>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -66,8 +67,6 @@ impl TermKind {
             }
         }
     }
-}
-impl TermKind {
     pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
         match self {
             TermKind::Var(v) => TermKind::Var(v.subst_type(sigma)),
@@ -80,7 +79,6 @@ impl TermKind {
             }
         }
     }
-
     pub fn subst(&self, sigma: &TermKindSubstitution) -> Self {
         match self {
             TermKind::Var(v) => match sigma.get(v) {
@@ -98,7 +96,7 @@ impl TermKind {
                     let mut forbidden = body.free_vars();
                     forbidden.remove(var);
                     forbidden.extend(set_fv);
-                    let fresh_var = crate::terms::new_var(var.ty(), forbidden);
+                    let fresh_var = new_var(var.ty(), forbidden);
                     sigma_wo_var.insert(var.clone(), TermKind::Var(fresh_var.clone()));
                     TermKind::abs(fresh_var,body.subst(&sigma_wo_var))
                 } else {
@@ -108,7 +106,6 @@ impl TermKind {
         }
     }
 }
-
 fn free_vars_of_substitution(sigma: &TermKindSubstitution) -> HashSet<ObjVar> {
     let h: HashSet<TermKind> = sigma.clone().into_values().collect();
     free_vars(h)
@@ -119,4 +116,106 @@ fn free_vars(h: HashSet<TermKind>) -> HashSet<ObjVar> {
         set.extend(t.free_vars());
     }
     set
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::Types;
+    use std::collections::{HashMap, HashSet};
+    #[test]
+    fn free_type_vars_collects_variables_from_whole_term() {
+        let x = ObjVar::with_name(0, Types::TypeVar(0), "x");
+        let y = ObjVar::with_name(1, Types::list(Types::TypeVar(1)), "y");
+
+        let t = TermKind::app(
+            TermKind::abs(x.clone(), TermKind::Var(x)),
+            TermKind::app(
+                TermKind::Const(Const::Nil(Types::TypeVar(2))),
+                TermKind::Var(y),
+            ),
+        );
+
+        assert_eq!(t.free_type_vars(), HashSet::from([0, 1, 2]));
+    }
+    #[test]
+    fn free_vars_of_substitution_collects_free_variables_with_abstraction() {
+        let x = ObjVar::with_name(0, Types::Nat, "x");
+        let y = ObjVar::with_name(1, Types::Nat, "y");
+        let z = ObjVar::with_name(2, Types::Nat, "z");
+        let u = ObjVar::with_name(3, Types::Nat, "u");
+
+        let sigma: TermKindSubstitution = HashMap::from([
+            (x.clone(),
+                TermKind::abs(
+                    u.clone(),
+                    TermKind::app(
+                        TermKind::Var(u),
+                        TermKind::Var(y.clone())))),
+            (z.clone(),
+                TermKind::app(
+                    TermKind::Var(y.clone()),
+                    TermKind::Var(z.clone())))
+        ]);
+
+        let expected = HashSet::from([y, z]);
+
+        assert_eq!(free_vars_of_substitution(&sigma), expected);
+    }
+    #[test]
+    fn subst_replaces_variables_recursively() {
+        let x = ObjVar::with_name(0, Types::Nat, "x");
+        let y = ObjVar::with_name(1, Types::Nat, "y");
+        let z = ObjVar::with_name(2, Types::Nat, "z");
+
+        let term = TermKind::app(
+            TermKind::Var(x.clone()),
+            TermKind::app(TermKind::Var(y.clone()), TermKind::Const(Const::Zero)),
+        );
+
+        let sigma: TermKindSubstitution = HashMap::from([
+            (x.clone(), TermKind::Var(z.clone())),
+            (y.clone(),
+                TermKind::app(TermKind::Const(Const::Succ), TermKind::Const(Const::Zero)))
+        ]);
+
+        let expected = TermKind::app(
+            TermKind::Var(z),
+            TermKind::app(
+                TermKind::app(TermKind::Const(Const::Succ), TermKind::Const(Const::Zero)),
+                TermKind::Const(Const::Zero),
+            ),
+        );
+
+        assert_eq!(term.subst(&sigma), expected);
+    }
+    #[test]
+    fn subst_avoids_variable_capture_under_abstraction() {
+        let x = ObjVar::with_name(0, Types::Nat, "x");
+        let y = ObjVar::with_name(1, Types::Nat, "y");
+        let z = ObjVar::with_name(2, Types::Nat, "z");
+
+        let term = TermKind::abs(
+            y.clone(),
+            TermKind::app(TermKind::Var(x.clone()), TermKind::Var(y.clone())),
+        );
+
+        let sigma: TermKindSubstitution = HashMap::from([
+            (x.clone(), TermKind::Var(y.clone())),
+        ]);
+
+        let result = term.subst(&sigma);
+
+        let fresh = crate::terms::new_var(
+            &Types::Nat,
+            HashSet::from([y.clone()]),
+        );
+
+        let expected = TermKind::abs(
+            fresh.clone(),
+            TermKind::app(TermKind::Var(y), TermKind::Var(fresh)),
+        );
+
+        assert_eq!(result, expected);
+    }
 }

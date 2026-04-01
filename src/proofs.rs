@@ -58,7 +58,7 @@ impl Axiom  {
                                         &imp(&Formula::forall(n,&imp(form,form_succ)),
                                         form))))
             }
-            Axiom::IndList(l, a) => {todo!()}
+            Axiom::IndList(_l, _a) => {todo!()}
         }
     }
 }
