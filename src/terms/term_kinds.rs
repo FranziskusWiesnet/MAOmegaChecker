@@ -120,3 +120,36 @@ fn free_vars(h: HashSet<TermKind>) -> HashSet<ObjVar> {
     }
     set
 }
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use crate::types::Types;
+    #[test]
+    fn subst_avoids_variable_capture_under_abstraction() {
+        let x = ObjVar::with_name(0, Types::Nat, "x");
+        let y = ObjVar::with_name(1, Types::Nat, "y");
+
+        let term = TermKind::abs(
+            y.clone(),
+            TermKind::app(TermKind::Var(x.clone()), TermKind::Var(y.clone())),
+        );
+
+        let sigma: TermKindSubstitution = HashMap::from([
+            (x.clone(), TermKind::Var(y.clone())),
+        ]);
+
+        let result = term.subst(&sigma);
+
+        let fresh = crate::terms::new_var(
+            &Types::Nat,
+            HashSet::from([x.clone(),y.clone()]),
+        );
+
+        let expected = TermKind::abs(
+            fresh.clone(),
+            TermKind::app(TermKind::Var(y), TermKind::Var(fresh)),
+        );
+
+        assert_eq!(result, expected);
+    }
+}
