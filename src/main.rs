@@ -10,7 +10,7 @@ use crate::terms::obj_var::ObjVar;
 use crate::terms::Term;
 use crate::terms::{TermKind, TermKindSubstitution};
 use crate::terms::Const;
-use crate::formulas::{Formula, isQFree};
+use crate::formulas::{Formula, is_qfree};
 use crate::types::Types::TypeVar;
 use std::collections::HashMap;
 
@@ -35,7 +35,7 @@ fn setG(formula: &Formula) -> bool {
         Formula::Forall(_, A) => setI(A),
         Formula::Imp(A, B) =>
             setR(A) && setG(B) ||
-            setD(A) && setG(B) && setPrint(A) && isQFree(A) ||
+            setD(A) && setG(B) && setPrint(A) && is_qfree(A) ||
                 //setD(A) && setI(A) && setG(B) && setPrint(A) && setPrint(B) ||
                 setD(A) && setI(B)
     }

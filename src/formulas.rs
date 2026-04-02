@@ -1,10 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashSet};
 use std::fmt;
-use crate::terms::{Const, ObjVar, Term, check_term_substitution};
-use crate::types::{TypeError, Types};
-
-pub type TypeSubstitution = HashMap<usize, Types>;
-pub type TermSubstitution = HashMap<ObjVar, Term>;
+use crate::terms::{Const, ObjVar, Term, free_vars_of_substitution, TermSubstitution, TermKindSubstitution, new_var};
+use crate::types::{TypeError, Types, TypeSubstitution};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Formula {
@@ -23,7 +20,7 @@ impl fmt::Display for Formula {
                 } else {
                     write!(f, "{}",t)}},
             Formula::Imp(a, b) => write!(f, "({} -> {})", a, b),
-            Formula::Forall(x, a) => write!(f, "(∀ x{}. {})", x, a),
+            Formula::Forall(x, a) => write!(f, "(∀ {}. {})", x, a),
         }
     }
 }
@@ -32,33 +29,62 @@ impl Formula {
         if *t.ty() != Types::Boolean {
             return Err(TypeError::ExpectedBoolean(t.ty().clone()));
         }
-
         Ok(Formula::Atom(t.clone()))
     }
-    pub fn imp(a: &Formula, b: &Formula) -> Self {
-        Formula::Imp(Box::new(a.clone()), Box::new(b.clone()))
+    pub fn imp(a: Formula, b: Formula) -> Self {
+        Formula::Imp(Box::new(a), Box::new(b))
     }
-    pub fn forall(x: &ObjVar, a: &Formula) -> Self {
-        Formula::Forall(x.clone(), Box::new(a.clone()))
+    pub fn forall(x: ObjVar, a: Formula) -> Self {
+        Formula::Forall(x.clone(), Box::new(a))
     }
-    pub fn bottom() -> Self {
-        Formula::Bottom
-    }
-
-    pub fn falsum() -> Self {Formula::Atom(Term::constant(Const::FF))}
-    pub fn verum() -> Self {Formula::Atom(Term::constant(Const::TT))}
+    pub fn falsum() -> Self { Formula::Atom(Term::constant(Const::FF)) }
+    pub fn verum() -> Self { Formula::Atom(Term::constant(Const::TT)) }
 
     pub fn F(&self) -> Self {
-        let F = Formula::Atom(Term::constant(Const::FF));
         match self {
-            Formula::Bottom => F,
+            Formula::Bottom => Formula::falsum(),
             Formula::Atom(_) => self.clone(),
-            Formula::Imp(a, b) =>  Formula::Imp(Box::new(a.F()), Box::new(b.F())),
-            Formula::Forall(x, a) => Formula::Forall( x.clone(), Box::new(a.F()) ),
-
+            Formula::Imp(a, b) => Formula::Imp(Box::new(a.F()), Box::new(b.F())),
+            Formula::Forall(x, a) => Formula::Forall(x.clone(), Box::new(a.F())),
         }
     }
-    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Formula {
+    pub fn free_type_vars(&self) -> HashSet<usize> {
+        match self {
+            Formula::Atom(t) => t.free_type_vars(),
+            Formula::Imp(prem, concl) => {
+                let mut set = prem.free_type_vars();
+                set.extend(concl.free_type_vars());
+                set
+            }
+            Formula::Forall(var, body) => {
+                let mut set = var.free_type_vars();
+                set.extend(body.free_type_vars());
+                set
+            }
+            Formula::Bottom => HashSet::new()
+        }
+    }
+    pub fn free_vars(&self) -> HashSet<ObjVar> {
+        match self {
+            Formula::Atom(t) => t.free_vars(),
+            Formula::Imp(prem, concl) => {
+                let mut set = prem.free_vars();
+                set.extend(concl.free_vars());
+                set
+            }
+            Formula::Forall(var, body) => {
+                let mut set = body.free_vars();
+                set.remove(var);
+                set
+            }
+            Formula::Bottom => HashSet::new()
+        }
+
+    }
+}
+
+impl Formula {
+pub fn subst_type(&self, sigma: &TypeSubstitution) -> Formula {
         match self {
             Formula::Atom(t) => Formula::Atom(t.subst_type(sigma)),
 
@@ -76,40 +102,201 @@ impl Formula {
         }
     }
     pub fn subst(&self, sigma: &TermSubstitution) -> Result<Formula, TypeError> {
-        check_term_substitution(sigma)?;
-        Ok(self.subst_unchecked(sigma))
-    }
-    fn subst_unchecked(&self, sigma: &TermSubstitution) -> Formula {
         match self {
-            Formula::Atom(t) => Formula::Atom(t.subst(sigma).unwrap()),
+            Formula::Atom(t) =>
+                {
+                    let s = t.subst(sigma)?;
+                    Ok(Formula::Atom(s))
+                },
 
-            Formula::Imp(a, b) => Formula::Imp(
-                Box::new(a.subst_unchecked(sigma)),
-                Box::new(b.subst_unchecked(sigma)),
-            ),
+            Formula::Imp(a, b) =>
+                {
+                    // In both cases, we check the substitution.
+                    // This could probably be done more efficiently.
+                    let s = a.subst(sigma)?;
+                    let t = b.subst(sigma)?;
+                    Ok(Formula::imp(s,t))
+                }
 
-            Formula::Forall(bound, body) => {
-                let mut restricted = sigma.clone();
-                restricted.remove(bound);
+            Formula::Forall(var, body) => {
+                let mut sigma_wo_var = sigma.clone();
+                sigma_wo_var.remove(var);
+                let sigma_kind: TermKindSubstitution =
+                    sigma_wo_var.iter()
+                        .map(|(k,t)| (k.clone(),t.kind().clone()))
+                        .collect();
+                let set_fv = free_vars_of_substitution(&sigma_kind);
+                if set_fv.contains(&var) {
+                    let mut forbidden = body.free_vars();
+                    forbidden.extend(set_fv);
+                    let fresh_var = new_var(var.ty(), forbidden);
+                    sigma_wo_var.insert(var.clone(), Term::var(&fresh_var));
+                    let body_subst = body.subst(&sigma_wo_var)?;
+                    Ok(Formula::forall(fresh_var, body_subst))
 
-                Formula::Forall(
-                    bound.clone(),
-                    Box::new(body.subst_unchecked(&restricted)),
-                )
+                } else {
+                    let body_subst = body.subst(&sigma_wo_var)?;
+                    Ok(Formula::forall(var.clone(), body_subst))
+                }
+
             }
-
-            Formula::Bottom => Formula::Bottom,
+            Formula::Bottom => Ok(Formula::Bottom),
         }
     }
 }
 
 
-pub fn isQFree(formula: &Formula) -> bool {
+pub fn is_qfree(formula: &Formula) -> bool {
     match formula {
         Formula::Bottom => true,
         Formula::Atom(_) => true,
         Formula::Forall(_, _) => false,
-        Formula::Imp(g, h) => isQFree(&g) && isQFree(&h),
+        Formula::Imp(g, h) => is_qfree(&g) && is_qfree(&h),
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::{HashMap,HashSet};
+    use crate::terms::{ObjVar, Term};
+    use crate::types::Types;
+
+    #[test]
+    fn free_type_vars_collects_from_atoms_implications_and_binders() {
+        // type variables: 1, 2, 3
+        let alpha = Types::TypeVar(1);
+        let beta  = Types::TypeVar(2);
+        let gamma = Types::TypeVar(3);
+
+        let x = ObjVar::new(0, alpha.clone());
+        let y = ObjVar::new(0, beta.clone());
+        let z = ObjVar::new(0, gamma.clone());
+
+        let f = ObjVar::new(0, Types::arr(alpha.clone(),Types::Boolean));
+        let g = ObjVar::new(0, Types::arr(beta.clone(),Types::Boolean));
+
+        let fx = Term::app(&Term::var(&f),&Term::var(&x)).unwrap();
+        let gy = Term::app(&Term::var(&g),&Term::var(&y)).unwrap();
+        // Atomic formulas with free type vars {1} and {2}
+        let form_fx = Formula::atom(&fx).unwrap();
+        let form_gy = Formula::atom(&gy).unwrap();
+
+
+        let imp = Formula::imp(form_fx, form_gy);
+
+        let formula = Formula::forall(z, imp);
+
+        let expected: HashSet<usize> = HashSet::from([1, 2, 3]);
+
+        assert_eq!(formula.free_type_vars(), expected);
+    }
+    #[test]
+    fn subst_type_replaces_types_in_atoms_implications_and_binders() {
+        let alpha = Types::TypeVar(1);
+        let beta  = Types::TypeVar(2);
+        let gamma = Types::TypeVar(3);
+
+        let x = ObjVar::new(0, alpha.clone());
+        let y = ObjVar::new(0, beta.clone());
+        let z = ObjVar::new(0, gamma.clone());
+
+        let f = ObjVar::new(0, Types::arr(alpha.clone(), Types::Boolean));
+        let g = ObjVar::new(0, Types::arr(beta.clone(), Types::Boolean));
+        let h = ObjVar::new(0, Types::arr(gamma.clone(), Types::Boolean));
+
+        let fx = Term::app(&Term::var(&f), &Term::var(&x)).unwrap();
+        let gy = Term::app(&Term::var(&g), &Term::var(&y)).unwrap();
+        let hz = Term::app(&Term::var(&h), &Term::var(&z)).unwrap();
+
+        let form_fx = Formula::atom(&fx).unwrap();
+        let form_gy = Formula::atom(&gy).unwrap();
+        let form_hz = Formula::atom(&hz).unwrap();
+
+        let formula = Formula::forall(
+            z.clone(),
+            Formula::imp(form_fx, Formula::imp(form_hz, form_gy)),
+        );
+
+        let expected: HashSet<ObjVar> =
+            HashSet::from([x.clone(), y.clone(), f.clone(), g.clone(), h.clone()]);
+
+        assert_eq!(formula.free_vars(), expected);
+
+        let sigma: TypeSubstitution = HashMap::from([
+            (1, Types::Boolean),
+            (3, Types::arr(Types::Boolean, Types::Boolean)),
+        ]);
+
+        let result = formula.subst_type(&sigma);
+
+        let x_sub = ObjVar::new(0, Types::Boolean);
+        let y_sub = ObjVar::new(0, beta.clone());
+        let z_sub = ObjVar::new(0, Types::arr(Types::Boolean, Types::Boolean));
+
+        let f_sub = ObjVar::new(0, Types::arr(Types::Boolean, Types::Boolean));
+        let g_sub = ObjVar::new(0, Types::arr(beta.clone(), Types::Boolean));
+        let h_sub = ObjVar::new(
+            0,
+            Types::arr(Types::arr(Types::Boolean, Types::Boolean), Types::Boolean),
+        );
+
+        let fx_sub = Term::app(&Term::var(&f_sub), &Term::var(&x_sub)).unwrap();
+        let gy_sub = Term::app(&Term::var(&g_sub), &Term::var(&y_sub)).unwrap();
+        let hz_sub = Term::app(&Term::var(&h_sub), &Term::var(&z_sub)).unwrap();
+
+        let expected = Formula::forall(
+            z_sub,
+            Formula::imp(
+                Formula::atom(&fx_sub).unwrap(),
+                Formula::imp(
+                    Formula::atom(&hz_sub).unwrap(),
+                    Formula::atom(&gy_sub).unwrap(),
+                ),
+            ),
+        );
+
+        assert_eq!(result, expected);
+    }
+    #[test]
+    fn subst_avoids_variable_capture_under_forall() {
+        let alpha = Types::TypeVar(1);
+
+        let x = ObjVar::new(0, alpha.clone());
+        let y = ObjVar::new(1, alpha.clone());
+        let p = ObjVar::new(0, Types::arr(alpha.clone(), Types::Boolean));
+
+        let px = Term::app(&Term::var(&p), &Term::var(&x)).unwrap();
+        let py = Term::app(&Term::var(&p), &Term::var(&y)).unwrap();
+
+        let formula = Formula::forall(
+            y.clone(),
+            Formula::imp(
+                Formula::atom(&px).unwrap(),
+                Formula::atom(&py).unwrap(),
+            ),
+        );
+
+        let sigma: TermSubstitution =
+            HashMap::from([(x.clone(), Term::var(&y))]);
+
+        let result = formula.subst(&sigma).unwrap();
+
+        match result {
+            Formula::Forall(bound, body) => {
+                assert_ne!(bound, y);
+
+                let expected_left = Formula::atom(&py).unwrap();
+                let expected_right_term =
+                    Term::app(&Term::var(&p), &Term::var(&bound)).unwrap();
+                let expected_right = Formula::atom(&expected_right_term).unwrap();
+
+                assert_eq!(
+                    *body,
+                    Formula::imp(expected_left, expected_right)
+                );
+            }
+            _ => panic!("Expected a universally quantified formula"),
+        }
+    }
+}

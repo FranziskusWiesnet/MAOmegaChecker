@@ -106,11 +106,11 @@ impl TermKind {
         }
     }
 }
-fn free_vars_of_substitution(sigma: &TermKindSubstitution) -> HashSet<ObjVar> {
+pub fn free_vars_of_substitution(sigma: &TermKindSubstitution) -> HashSet<ObjVar> {
     let h: HashSet<TermKind> = sigma.clone().into_values().collect();
     free_vars(h)
 }
-fn free_vars(h: HashSet<TermKind>) -> HashSet<ObjVar> {
+pub fn free_vars(h: HashSet<TermKind>) -> HashSet<ObjVar> {
     let mut set = HashSet::new();
     for t in h {
         set.extend(t.free_vars());

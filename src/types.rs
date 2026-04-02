@@ -77,7 +77,7 @@ pub fn new_type_var(set: &HashSet<usize>) -> usize {
     }
     n
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TypeError {
     Mismatch {expected: Types, found: Types},
     ExpectedFunction(Types),
