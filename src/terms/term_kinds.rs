@@ -193,7 +193,6 @@ mod tests {
     fn subst_avoids_variable_capture_under_abstraction() {
         let x = ObjVar::with_name(0, Types::Nat, "x");
         let y = ObjVar::with_name(1, Types::Nat, "y");
-        let z = ObjVar::with_name(2, Types::Nat, "z");
 
         let term = TermKind::abs(
             y.clone(),
@@ -208,7 +207,7 @@ mod tests {
 
         let fresh = crate::terms::new_var(
             &Types::Nat,
-            HashSet::from([y.clone()]),
+            HashSet::from([x.clone(),y.clone()]),
         );
 
         let expected = TermKind::abs(
