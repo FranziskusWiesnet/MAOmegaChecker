@@ -77,12 +77,13 @@ pub fn new_type_var(set: &HashSet<usize>) -> usize {
     }
     n
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TypeError {
     Mismatch {expected: Types, found: Types},
     ExpectedFunction(Types),
     ExpectedBoolean(Types),
     ExpectedList(Types),
+    ExpectedInd(Types),
 }
 impl std::error::Error for TypeError {}
 impl fmt::Display for TypeError {
@@ -99,6 +100,9 @@ impl fmt::Display for TypeError {
             }
             TypeError::ExpectedList(ty) => {
                 write!(f, "expected list type, found {}", ty)
+            }
+            TypeError::ExpectedInd(ty) => {
+                write!(f, "expected inductive type, found {}", ty)
             }
         }
     }

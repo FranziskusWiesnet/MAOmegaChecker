@@ -2,15 +2,15 @@
 #![allow(dead_code)]
 mod types;
 mod formulas;
-mod proofs;
 mod terms;
+mod proofs;
 
 use crate::types::Types;
 use crate::terms::obj_var::ObjVar;
 use crate::terms::Term;
 use crate::terms::{TermKind, TermKindSubstitution};
 use crate::terms::Const;
-use crate::formulas::{Formula, isQFree};
+use crate::formulas::{Formula, is_qfree};
 use crate::types::Types::TypeVar;
 use std::collections::HashMap;
 
@@ -35,7 +35,7 @@ fn setG(formula: &Formula) -> bool {
         Formula::Forall(_, A) => setI(A),
         Formula::Imp(A, B) =>
             setR(A) && setG(B) ||
-            setD(A) && setG(B) && setPrint(A) && isQFree(A) ||
+            setD(A) && setG(B) && setPrint(A) && is_qfree(A) ||
                 //setD(A) && setI(A) && setG(B) && setPrint(A) && setPrint(B) ||
                 setD(A) && setI(B)
     }
@@ -83,6 +83,9 @@ fn main() {
     println!("{}", setG(&B));
     println!("{}", setD(&B));
 
+    let _x = ObjVar::new(0, Types::Boolean);
+    let _y = ObjVar::new(1, Types::Boolean);
+    let _z = ObjVar::new(2, Types::Boolean);
     let x = ObjVar::with_name(0, Types::Boolean, "x");
     let y = ObjVar::with_name(1, Types::Boolean, "y");
 
