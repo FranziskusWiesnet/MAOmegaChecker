@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use crate::formulas::Formula;
 use crate::terms::{ObjVar, Term, TermSubstitution};
@@ -6,6 +6,7 @@ use crate::proofs::axioms::{Axiom};
 use crate::proofs::assumptions::{ProofAssumption};
 use crate::types::TypeError;
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum ProofKind {
     Assumption(ProofAssumption),
     Ax(Axiom),
@@ -84,6 +85,38 @@ impl ProofKind {
                 }
             }
         }
+    }
+    pub fn free_assumptions(&self) -> HashSet<ProofAssumption> {
+        match self {
+            ProofKind::Assumption(p) => {
+                HashSet::from([p.clone()])
+            }
+            ProofKind::Ax(_) => {HashSet::new()}
+            ProofKind::ImpIntro(u, m) => {
+                let mut set = m.free_assumptions();
+                set.remove(u);
+                set
+            }
+            ProofKind::ImpElim(m, n) => {
+                let mut set = m.free_assumptions();
+                set.extend(n.free_assumptions());
+                set
+            }
+            ProofKind::AllIntro(var,m) => {
+                m.free_assumptions()
+            }
+            ProofKind::AllElim(m, t) => {
+                m.free_assumptions()
+            }
+        }
+    }
+    pub fn free_vars_in_assumptions(&self) -> HashSet<ObjVar> {
+        let free_assumptions = self.free_assumptions();
+        let mut set = HashSet::new();
+        for u in free_assumptions {
+            set.extend(u.form().free_vars().clone())
+        }
+        set
     }
 }
 
@@ -171,5 +204,59 @@ mod tests {
         ).unwrap();
         println!("{}", proof.formula().unwrap());
         assert_eq!(proof.formula().unwrap(), expected);
+    }
+    #[test]
+    fn free_assumptions_removes_discharged_assumption_in_imp_intro() {
+        let a = Formula::verum();
+        let u0 = ProofAssumption::new(0, a.clone());
+        let u1 = ProofAssumption::new(0, Formula::falsum());
+
+        let body = ProofKind::ImpElim(
+            Box::new(ProofKind::Assumption(u0.clone())),
+            Box::new(ProofKind::Assumption(u1.clone())),
+        );
+
+        let proof = ProofKind::ImpIntro(u0.clone(), Box::new(body));
+
+        let expected = HashSet::from([u1]);
+
+        assert_eq!(proof.free_assumptions(), expected);
+    }
+    #[test]
+    fn free_assumptions_unions_both_branches_of_imp_elim() {
+        let u0 = ProofAssumption::new(0, Formula::verum());
+        let u1 = ProofAssumption::new(1, Formula::falsum());
+
+        let proof = ProofKind::ImpElim(
+            Box::new(ProofKind::Assumption(u0.clone())),
+            Box::new(ProofKind::Assumption(u1.clone())),
+        );
+
+        let expected = HashSet::from([u0, u1]);
+
+        assert_eq!(proof.free_assumptions(), expected);
+    }
+    #[test]
+    fn free_vars_in_assumptions_collects_only_from_free_assumptions() {
+        let x = ObjVar::with_name(0, Types::Nat, "x");
+        let y = ObjVar::with_name(1, Types::Nat, "y");
+        let p = ObjVar::with_name(2, Types::arr(Types::Nat, Types::Boolean), "p");
+
+        let px = Formula::atom(&Term::app(&Term::var(&p), &Term::var(&x)).unwrap()).unwrap();
+        let py = Formula::atom(&Term::app(&Term::var(&p), &Term::var(&y)).unwrap()).unwrap();
+
+        let u0 = ProofAssumption::new(0, px);
+        let u1 = ProofAssumption::new(1, py);
+
+        let body = ProofKind::ImpElim(
+            Box::new(ProofKind::Assumption(u0.clone())),
+            Box::new(ProofKind::Assumption(u1.clone())),
+        );
+
+        let proof = ProofKind::ImpIntro(u0, Box::new(body));
+
+        let expected = HashSet::from([p, y]);
+
+        assert_eq!(proof.free_vars_in_assumptions(), expected);
     }
 }
