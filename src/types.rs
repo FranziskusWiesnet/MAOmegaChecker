@@ -83,6 +83,7 @@ pub enum TypeError {
     ExpectedFunction(Types),
     ExpectedBoolean(Types),
     ExpectedList(Types),
+    ExpectedInd(Types),
 }
 impl std::error::Error for TypeError {}
 impl fmt::Display for TypeError {
@@ -99,6 +100,9 @@ impl fmt::Display for TypeError {
             }
             TypeError::ExpectedList(ty) => {
                 write!(f, "expected list type, found {}", ty)
+            }
+            TypeError::ExpectedInd(ty) => {
+                write!(f, "expected inductive type, found {}", ty)
             }
         }
     }
