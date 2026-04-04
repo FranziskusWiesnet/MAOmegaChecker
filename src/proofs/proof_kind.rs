@@ -6,7 +6,7 @@ use crate::proofs::axioms::{Axiom};
 use crate::proofs::assumptions::{ProofAssumption};
 use crate::types::TypeError;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProofKind {
     Assumption(ProofAssumption),
     Ax(Axiom),
@@ -40,6 +40,23 @@ pub enum ProofError {
     Mismatch(Formula,Formula),
     ExpectedImplication(Formula),
     ExpectedForall(Formula),
+    AllIntro(ObjVar, ProofKind),
+}
+impl std::error::Error for ProofError {}
+impl fmt::Display for ProofError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ProofError::Type(e) => {write!(f,"{}",e)}
+            ProofError::Mismatch(expected, found) =>
+                write!(f, "implication mismatch: expected {}, found {}", expected, found),
+            ProofError::ExpectedImplication(found) =>
+                write!(f, "implication expected, found {}", found),
+            ProofError::ExpectedForall(found) =>
+                write!(f, "universal formula expected, found {}", found),
+            ProofError::AllIntro(var, proof) =>
+                write!(f, "{} free in the assumptions of {}", var, proof),
+        }
+    }
 }
 impl ProofKind {
     pub fn formula(&self) -> Result<Formula,ProofError> {
@@ -102,10 +119,10 @@ impl ProofKind {
                 set.extend(n.free_assumptions());
                 set
             }
-            ProofKind::AllIntro(var,m) => {
+            ProofKind::AllIntro(_var,m) => {
                 m.free_assumptions()
             }
-            ProofKind::AllElim(m, t) => {
+            ProofKind::AllElim(m, _) => {
                 m.free_assumptions()
             }
         }

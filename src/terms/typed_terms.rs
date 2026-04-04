@@ -24,6 +24,18 @@ impl Term {
             kind: TermKind::Const(c),
         }
     }
+    pub fn tt() -> Self {
+        Self{
+            ty: Types::Boolean,
+            kind: TermKind::Const(Const::TT)
+        }
+    }
+    pub fn ff() -> Self {
+        Self{
+            ty: Types::Boolean,
+            kind: TermKind::Const(Const::FF)
+        }
+    }
     pub fn abs(var: &ObjVar, t: &Term) -> Self {
         Self{
             ty: Types::arr(var.ty().clone(), t.ty().clone()),

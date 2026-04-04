@@ -4,7 +4,7 @@ use crate::formulas::Formula;
 use crate::terms::{new_var, Const, ObjVar, Term, TermSubstitution};
 
 use crate::types::{TypeError, Types};
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Axiom {
     AxTrue,
     BotIntro,
