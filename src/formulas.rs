@@ -1,9 +1,10 @@
-use std::collections::{HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fmt;
-use crate::terms::{Const, ObjVar, Term, free_vars_of_substitution, TermSubstitution, TermKindSubstitution, new_var};
+use std::hash::{Hash, Hasher};
+use crate::terms::{Const, ObjVar, Term, free_vars_of_substitution, TermSubstitution, TermKindSubstitution, new_var, TermKind};
 use crate::types::{TypeError, Types, TypeSubstitution};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum Formula {
     Atom(Term),
     Imp(Box<Formula>, Box<Formula>),
@@ -24,6 +25,7 @@ impl fmt::Display for Formula {
         }
     }
 }
+
 impl Formula {
     pub fn atom(t: &Term) -> Result<Self, TypeError> {
         if *t.ty() != Types::Boolean {
@@ -84,7 +86,7 @@ impl Formula {
 }
 
 impl Formula {
-pub fn subst_type(&self, sigma: &TypeSubstitution) -> Formula {
+    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Formula {
         match self {
             Formula::Atom(t) => Formula::Atom(t.subst_type(sigma)),
 
@@ -144,6 +146,69 @@ pub fn subst_type(&self, sigma: &TypeSubstitution) -> Formula {
         }
     }
 }
+impl PartialEq for Formula {
+    fn eq(&self, other: &Formula) -> bool {
+        match (self,other) {
+            (Formula::Bottom, Formula::Bottom) => true,
+            (Formula::Atom(a), Formula::Atom(b)) => a == b,
+            (Formula::Imp(a,b),
+                Formula::Imp(c,d)) => a == c && d == b,
+            (Formula::Forall(x,a),
+                Formula::Forall(y,b)) => {
+                if x.ty() != y.ty() {
+                    return false;
+                }
+                let mut set = a.free_vars();
+                set.extend(b.free_vars());
+                let fresh_var = new_var(x.ty(), set);
+                let sigma_x: TermSubstitution =
+                    HashMap::from([(x.clone(),Term::var(&fresh_var.clone()))]);
+                let sigma_y: TermSubstitution =
+                    HashMap::from([(y.clone(),Term::var(&fresh_var.clone()))]);
+                a.subst(&sigma_x) == b.subst(&sigma_y)
+            }
+            _ => false,
+        }
+    }
+}
+impl Eq for Formula {}
+
+impl Hash for Formula {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let mut env: HashMap<ObjVar, usize> = HashMap::new();
+        self.hash_rec(state, &mut env, 0);
+    }
+}
+impl Formula {
+    fn hash_rec<H: Hasher>(&self, state: &mut H, env: &mut HashMap<ObjVar, usize>, depth: usize) {
+        match self {
+            Formula::Bottom => {
+                0u8.hash(state);
+            },
+            Formula::Atom(t) => {
+                1u8.hash(state);
+                t.ty().hash(state);
+                t.kind().hash_rec(state, env, depth);
+            }
+            Formula::Imp(a,b) => {
+                2u8.hash(state);
+                a.hash_rec(state, env, depth);
+                b.hash_rec(state, env, depth);
+            }
+            Formula::Forall(v,body) => {
+                3u8.hash(state);
+                v.ty().hash(state);
+                let old = env.insert(v.clone(), depth);
+                body.hash_rec(state, env, depth + 1);
+                match old {
+                    Some(prev) => {env.insert(v.clone(), prev);}
+                    None => {env.remove(v);}
+                }
+            }
+        }
+    }
+}
+
 
 
 pub fn is_qfree(formula: &Formula) -> bool {

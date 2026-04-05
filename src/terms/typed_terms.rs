@@ -263,4 +263,19 @@ mod tests {
         assert_eq!(result.ty(), &expected);
         assert_eq!(result.to_string(), "(cons_ℕ 0)");
     }
+    #[test]
+    fn equal_terms_respect_alpha_equivalence_of_abstractions() {
+        let alpha = Types::TypeVar(0);
+
+        let x = ObjVar::new(0, alpha.clone());
+        let y = ObjVar::new(1, alpha.clone());
+
+        let tx = Term::abs(&x, &Term::var(&x));
+        let ty = Term::abs(&y, &Term::var(&y));
+
+        assert_eq!(tx.ty(), &Types::arr(alpha.clone(), alpha.clone()));
+        assert_eq!(ty.ty(), &Types::arr(alpha.clone(), alpha.clone()));
+
+        assert_eq!(tx, ty);
+    }
 }

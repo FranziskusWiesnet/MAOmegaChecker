@@ -280,15 +280,7 @@ mod tests {
         ).unwrap();
         let proof = Proof::all_intro(n.clone(), Proof::imp_intro(assumption_base,Proof::imp_intro(assumption_step, proof_part))).unwrap();
 
-        let expected = Formula::forall(
-            n,
-            Formula::imp(
-                Formula::atom(
-                    &Term::app(&Term::var(&p), &Term::constant(Const::Zero)).unwrap()
-                ).unwrap(),
-                Formula::imp(step_formula, pn),
-            ),
-        );
+
         assert_eq!(proof.formula.to_string(),
                    "(∀ n. ((P 0) -> ((∀ n. ((P n) -> (P (S n)))) -> (P n))))");
     }
@@ -346,7 +338,7 @@ mod tests {
             proof_base,
             proof_step,
         );
-        println!("{}", proof.unwrap_err());
+        println!("{}", proof.unwrap());
 
     }
 }

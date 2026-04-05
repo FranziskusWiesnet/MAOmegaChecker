@@ -41,7 +41,8 @@ impl Axiom {
                     (b.clone(), Term::constant(Const::FF))
                 ]);
                 let form_ff = form.subst(&sigma)?;
-                Ok(Formula::forall(b.clone(),Formula::imp(form_tt,Formula::imp(form_ff,form.clone()))))
+                Ok(Formula::forall(b.clone(),
+                                   Formula::imp(form_tt, Formula::imp(form_ff,form.clone()))))
             }
             Axiom::Ind(var, form) => {
                 match var.ty() {
@@ -49,14 +50,17 @@ impl Axiom {
                         let sigma: TermSubstitution = HashMap::from(
                             [(var.clone(),Term::constant(Const::Zero))]);
                         let form_zero = form.subst(&sigma)?;
-                        let succ_var = Term::app(&Term::constant(Const::Succ), &Term::var(var))?;
+                        let succ_var = Term::app(&Term::constant(Const::Succ),
+                                                 &Term::var(var))?;
                         let sigma: TermSubstitution = HashMap::from(
                             [(var.clone(),succ_var)]);
                         let form_succ_var = form.subst(&sigma)?;
                         Ok(
                             Formula::forall(var.clone(),
                                         Formula::imp(form_zero, Formula::imp(
-                                            Formula::forall(var.clone(),Formula::imp(form.clone(),form_succ_var)),
+                                            Formula::forall(var.clone(),
+                                                            Formula::imp(form.clone(),
+                                                                         form_succ_var)),
                                         form.clone()))))
                     }
                     Types::List(tau) => {
@@ -66,7 +70,9 @@ impl Axiom {
                         let fv = form.free_vars();
                         let fresh_var = new_var(tau, fv);
                         let cons_fresh_var =
-                            Term::app(&Term::app(&Term::constant(Const::Cons(tau.as_ref().clone())), &Term::var(&fresh_var))?,&Term::var(&var))?;
+                            Term::app(&Term::app(
+                                &Term::constant(Const::Cons(tau.as_ref().clone())),
+                                &Term::var(&fresh_var))?,&Term::var(&var))?;
                         let sigma: TermSubstitution = HashMap::from(
                             [(var.clone(),cons_fresh_var)]);
                         let form_cons_fresh_var = form.subst(&sigma)?;
@@ -76,7 +82,9 @@ impl Axiom {
                                 var.clone(),
                                 Formula::imp(form.clone(), form_cons_fresh_var)
                                 ));
-                        Ok(Formula::forall(var.clone(),Formula::imp(form_nil, Formula::imp(step,form.clone()))))
+                        Ok(Formula::forall(var.clone(),
+                                           Formula::imp(form_nil,
+                                                        Formula::imp(step,form.clone()))))
                     }
                     _ => Err(TypeError::ExpectedInd(var.ty().clone()))
                 }
@@ -114,7 +122,9 @@ mod tests {
     #[test]
     fn case_on_boolean_variable_builds_expected_formula() {
         let b = ObjVar::with_name(0, Types::Boolean, "b");
-        let f = ObjVar::with_name(0, Types::arr(Types::Boolean, Types::Boolean), "f");
+        let f = ObjVar::with_name(0,
+                                  Types::arr(Types::Boolean, Types::Boolean),
+                                  "f");
 
         let fb = Term::from_kind(&TermKind::app(
             TermKind::Var(f.clone()),

@@ -1,12 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use crate::types::TypeSubstitution;
 use crate::terms::ObjVar;
 use crate::terms::Const;
 use crate::terms::new_var;
 pub type TermKindSubstitution = HashMap<ObjVar, TermKind>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum TermKind {
     Var(ObjVar),
     Const(Const),
@@ -106,10 +107,6 @@ impl TermKind {
         }
     }
 }
-pub fn free_vars_of_substitution(sigma: &TermKindSubstitution) -> HashSet<ObjVar> {
-    let h: HashSet<TermKind> = sigma.clone().into_values().collect();
-    free_vars(h)
-}
 pub fn free_vars(h: HashSet<TermKind>) -> HashSet<ObjVar> {
     let mut set = HashSet::new();
     for t in h {
@@ -117,12 +114,95 @@ pub fn free_vars(h: HashSet<TermKind>) -> HashSet<ObjVar> {
     }
     set
 }
+impl PartialEq for TermKind {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (TermKind::Var(u), TermKind::Var(v)) => u==v,
+            (TermKind::Const(c), TermKind::Const(d)) => c == d,
+            (TermKind::App(f, t),
+                TermKind::App(g, s)) => f == g && t == s,
+            (TermKind::Abs(x, t),
+                TermKind::Abs(y, s)) => {
+                    if x.ty() != y.ty() {
+                        return false;
+                    }
+                    let mut set = t.free_vars();
+                    set.extend(s.free_vars());
+                    let fresh_var = new_var(x.ty(), set);
+                    let sigma_x: TermKindSubstitution =
+                        HashMap::from([(x.clone(),TermKind::Var(fresh_var.clone()))]);
+                    let sigma_y:TermKindSubstitution =
+                        HashMap::from([(y.clone(),TermKind::Var(fresh_var.clone()))]);
+                    t.subst(&sigma_x) == s.subst(&sigma_y)
+                }
+            _ => false,
+            }
+        }
+    }
+impl Eq for TermKind {}
+impl Hash for TermKind {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let mut env: HashMap<ObjVar, usize> = HashMap::new();
+        self.hash_rec(state, &mut env, 0);
+    }
+}
+impl TermKind {
+    pub fn hash_rec<H: Hasher>(
+        &self,
+        state: &mut H,
+        env: &mut HashMap<ObjVar, usize>,
+        depth: usize,
+    ) {
+        match self {
+            TermKind::Var(v) => {
+                0u8.hash(state);
+                if let Some(binder_depth) = env.get(v) {
+                    0u8.hash(state);
+                    (depth - 1 - binder_depth).hash(state);
+                    v.ty().hash(state);
+                } else {
+                    1u8.hash(state);
+                    v.hash(state);
+                }
+            }
+            TermKind::Const(c) => {
+                1u8.hash(state);
+                c.hash(state);
+            }
+            TermKind::App(f, a) => {
+                2u8.hash(state);
+                f.hash_rec(state, env, depth);
+                a.hash_rec(state, env, depth);
+            }
+            TermKind::Abs(x, body) => {
+                3u8.hash(state);
+                x.ty().hash(state);
 
+                let old = env.insert(x.clone(), depth);
+                body.hash_rec(state, env, depth + 1);
+
+                match old {
+                    Some(prev) => {
+                        env.insert(x.clone(), prev);
+                    }
+                    None => {
+                        env.remove(x);
+                    }
+                }
+            }
+        }
+    }
+}
+pub fn free_vars_of_substitution(sigma: &TermKindSubstitution) -> HashSet<ObjVar> {
+    let h: HashSet<TermKind> = sigma.clone().into_values().collect();
+    free_vars(h)
+}
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::types::Types;
     use std::collections::{HashMap, HashSet};
+    use std::collections::hash_map::DefaultHasher;
     #[test]
     fn free_type_vars_collects_variables_from_whole_term() {
         let x = ObjVar::with_name(0, Types::TypeVar(0), "x");
@@ -217,4 +297,55 @@ mod tests {
 
         assert_eq!(result, expected);
     }
+    fn hash_of<T: Hash>(x: &T) -> u64 {
+        let mut h = DefaultHasher::new();
+        x.hash(&mut h);
+        h.finish()
+    }
+    #[test]
+    fn alpha_equivalent_abstractions_are_equal() {
+        let alpha = Types::TypeVar(0);
+
+        let x = ObjVar::new(0, alpha.clone());
+        let y = ObjVar::new(1, alpha.clone());
+
+        let tx = TermKind::abs(x.clone(), TermKind::Var(x.clone()));
+        let ty = TermKind::abs(y.clone(), TermKind::Var(y.clone()));
+
+        assert_eq!(tx, ty);
+        assert_eq!(hash_of(&tx), hash_of(&ty));
+    }
+    #[test]
+    fn alpha_equivalents_is_type_dependent() {
+        let alpha = Types::TypeVar(0);
+        let beta = Types::TypeVar(1);
+
+        let x = ObjVar::new(0, alpha.clone());
+        let y = ObjVar::new(1, beta.clone());
+
+        let tx = TermKind::abs(x.clone(), TermKind::Var(x.clone()));
+        let ty = TermKind::abs(y.clone(), TermKind::Var(y.clone()));
+
+        assert_ne!(tx, ty);
+    }
+    #[test]
+    fn alpha_equivalents_dependents_on_the_abstraction_order() {
+        let alpha = Types::TypeVar(0);
+
+        let x = ObjVar::new(0, alpha.clone());
+        let y = ObjVar::new(1, alpha.clone());
+
+        let t1 = TermKind::abs(
+            x.clone(),
+            TermKind::abs(y.clone(), TermKind::Var(x.clone())),
+        );
+
+        let t2 = TermKind::abs(
+            x.clone(),
+            TermKind::abs(y.clone(), TermKind::Var(y.clone())),
+        );
+
+        assert_ne!(t1, t2);
+    }
+
 }
