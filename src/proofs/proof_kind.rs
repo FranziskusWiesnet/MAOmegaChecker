@@ -4,7 +4,9 @@ use crate::formulas::Formula;
 use crate::terms::{ObjVar, Term, TermSubstitution};
 use crate::proofs::axioms::{Axiom};
 use crate::proofs::assumptions::{ProofAssumption};
-use crate::types::TypeError;
+use crate::types::{TypeError, TypeSubstitution};
+
+pub type ProofKindSubstitution = HashMap<ProofAssumption, ProofKind>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProofKind {
@@ -134,6 +136,78 @@ impl ProofKind {
             set.extend(u.form().free_vars().clone())
         }
         set
+    }
+    pub fn free_type_vars(&self) -> HashSet<usize> {
+        match self {
+            ProofKind::Assumption(p) => {p.form().free_type_vars()}
+            ProofKind::Ax(a) => {a.free_type_vars()}
+            ProofKind::ImpIntro(u, m) => {
+                let mut set = m.free_type_vars();
+                set.extend(u.form().free_type_vars().clone());
+                set
+            }
+            ProofKind::ImpElim(m, n) => {
+                let mut set = m.free_type_vars();
+                set.extend(n.free_type_vars());
+                set
+            }
+            ProofKind::AllIntro(var,m) => {
+                let mut set = m.free_type_vars();
+                set.extend(var.free_type_vars());
+                set
+            }
+            ProofKind::AllElim(forall_proof,t) => {
+                let mut set = forall_proof.free_type_vars();
+                set.extend(t.free_type_vars());
+                set
+            }
+        }
+    }
+    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self  {
+        match self {
+            ProofKind::Assumption(p) => {
+                ProofKind::Assumption(p.subst_type(sigma))
+            }
+            ProofKind::Ax(a) => {ProofKind::Ax(a.subst_type(sigma))}
+            ProofKind::ImpIntro(u, m) => {
+                ProofKind::ImpIntro(u.subst_type(sigma),Box::new(m.subst_type(sigma)))
+            }
+            ProofKind::ImpElim(m, n) => {
+                ProofKind::ImpElim(Box::new(m.subst_type(sigma)),Box::new(n.subst_type(sigma)))
+            }
+            ProofKind::AllIntro(var,m) => {
+                ProofKind::AllIntro(var.subst_type(sigma),Box::new(m.subst_type(sigma)))
+            }
+            ProofKind::AllElim(forall_proof,t) => {
+                ProofKind::AllElim(Box::new(forall_proof.subst_type(sigma)), t.subst_type(sigma))
+            }
+        }
+    }
+    pub fn free_vars(&self) -> HashSet<ObjVar> {
+        match self {
+            ProofKind::Assumption(p) => p.form().free_vars(),
+            ProofKind::Ax(a) => {a.free_vars()}
+            ProofKind::ImpIntro(u, m) => {
+                let mut set = m.free_vars();
+                set.extend(u.form().free_vars());
+                set
+            }
+            ProofKind::ImpElim(m, n) => {
+                let mut set = m.free_vars();
+                set.extend(n.free_vars());
+                set
+            }
+            ProofKind::AllIntro(var,m) => {
+                let mut set = m.free_vars();
+                set.remove(&var);
+                set
+            }
+            ProofKind::AllElim(forall_proof,t) => {
+                let mut set = forall_proof.free_vars();
+                set.extend(t.free_vars());
+                set
+            }
+        }
     }
 }
 

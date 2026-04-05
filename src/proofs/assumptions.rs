@@ -1,5 +1,7 @@
 use std::fmt;
 use crate::formulas::Formula;
+use crate::types::TypeSubstitution;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ProofAssumption {
     id: usize,
@@ -16,6 +18,12 @@ impl ProofAssumption {
     }
     pub fn form(&self) -> Formula {
         self.form.clone()
+    }
+    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
+        Self {
+            id: self.id,
+            form: self.form.clone().subst_type(sigma),
+        }
     }
     pub fn new(id: usize, form: Formula) -> Self {
         Self {id, form}

@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use crate::formulas::Formula;
 use crate::terms::{new_var, Const, ObjVar, Term, TermSubstitution};
 
-use crate::types::{TypeError, Types};
+use crate::types::{TypeError, TypeSubstitution, Types};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Axiom {
     AxTrue,
@@ -90,6 +90,48 @@ impl Axiom {
                 }
             }
         }
+    }
+    pub fn free_type_vars(&self) -> HashSet<usize> {
+        match self {
+            Axiom::AxTrue => HashSet::new(),
+            Axiom::BotIntro => HashSet::new(),
+            Axiom::Case(b, form) => {
+                let mut set = form.free_type_vars();
+                set.extend(b.free_type_vars());
+                set
+            }
+            Axiom::Ind(var, form) => {
+                let mut set = form.free_type_vars();
+                set.extend(var.free_type_vars());
+                set
+            }
+        }
+    }
+    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
+        match self {
+            Axiom::AxTrue => Axiom::AxTrue,
+            Axiom::BotIntro => Axiom::BotIntro,
+            Axiom::Case(b, form) => 
+                {Axiom::Case(b.subst_type(sigma), form.subst_type(sigma))}
+            Axiom::Ind(var, form) =>
+                {Axiom::Ind(var.subst_type(sigma), form.subst_type(sigma))}
+        }
+    }
+    pub fn free_vars(&self) -> HashSet<ObjVar> {
+        let mut set = HashSet::new();
+        match self {
+            Axiom::AxTrue => {},
+            Axiom::BotIntro => {},
+            Axiom::Case(b, form) => {
+                set.extend(form.free_vars());
+                set.remove(b);
+            }
+            Axiom::Ind(var, form) => {
+                set.extend(form.free_vars());
+                set.remove(var);
+            }
+        }
+        set
     }
 }
 

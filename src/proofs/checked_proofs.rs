@@ -5,6 +5,8 @@ use crate::proofs::axioms::Axiom;
 use crate::proofs::proof_kind::{ProofError, ProofKind};
 use crate::proofs::ProofAssumption;
 use crate::terms::{ObjVar, Term, TermSubstitution};
+use crate::types::TypeSubstitution;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Proof {
     formula: Formula,
@@ -101,6 +103,19 @@ impl Proof {
     pub fn free_assumptions(self) -> HashSet<ProofAssumption> {
         self.kind.free_assumptions()
     }
+    pub fn free_type_vars(&self) -> HashSet<usize> {
+        self.kind.free_type_vars()
+    }
+    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
+        Self{
+            formula: self.formula.subst_type(sigma),
+            kind: self.kind.subst_type(sigma)
+        }
+    }
+    pub fn free_vars(&self) -> HashSet<ObjVar> {
+        self.kind.free_vars()
+    }
+    
     pub fn cases(b: ObjVar, formula: Formula, proof_tt: Proof, proof_ff: Proof)
         -> Result<Self, ProofError> {
         let ax = Proof::from_axiom(Axiom::Case(b,formula))?;
