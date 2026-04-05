@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use crate::terms::{Const, ObjVar, Term, free_vars_of_substitution, TermSubstitution, TermKindSubstitution, new_var, TermKind};
+use crate::terms::{Const, ObjVar, Term, free_vars_of_substitution,
+                   TermSubstitution, TermKindSubstitution, new_var};
 use crate::types::{TypeError, Types, TypeSubstitution};
 
 #[derive(Debug, Clone)]
