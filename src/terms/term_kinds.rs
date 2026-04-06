@@ -7,6 +7,7 @@ use crate::terms::Const;
 use crate::terms::new_var;
 pub type TermKindSubstitution = HashMap<ObjVar, TermKind>;
 
+
 #[derive(Debug, Clone)]
 pub enum TermKind {
     Var(ObjVar),

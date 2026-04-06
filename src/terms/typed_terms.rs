@@ -1,8 +1,9 @@
 use std::fmt;
 use std::fmt::Debug;
 use std::collections::{HashMap, HashSet};
-use crate::terms::{TermKind,ObjVar,Const,TermKindSubstitution};
-use crate::types::{Types,TypeError,TypeSubstitution};
+use std::hash::Hash;
+use crate::terms::{TermKind, ObjVar, Const, TermKindSubstitution};
+use crate::types::{Types, TypeError, TypeSubstitution};
 
 pub type TermSubstitution = HashMap<ObjVar, Term>;
 
@@ -139,6 +140,17 @@ impl fmt::Display for Term {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.kind)
     }
+}
+pub fn term_free_vars(set: HashSet<Term>) -> HashSet<ObjVar> {
+    let mut h : HashSet<ObjVar> = HashSet::new();
+    for t in set {
+        h.extend(t.free_var());
+    }
+    h
+}
+pub fn free_vars_of_term_substitution(sigma: &TermSubstitution) -> HashSet<ObjVar> {
+    let h: HashSet<Term> = sigma.clone().into_values().collect();
+    term_free_vars(h)
 }
 
 #[cfg(test)]

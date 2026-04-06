@@ -1,14 +1,16 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use crate::formulas::Formula;
-use crate::terms::{ObjVar, Term, TermSubstitution};
+use crate::terms::{new_var, ObjVar, Term, TermSubstitution};
 use crate::proofs::axioms::{Axiom};
-use crate::proofs::assumptions::{ProofAssumption};
+use crate::proofs::assumptions::{new_assumption, ProofAssumption};
+use crate::terms::typed_terms::free_vars_of_term_substitution;
 use crate::types::{TypeError, TypeSubstitution};
 
 pub type ProofKindSubstitution = HashMap<ProofAssumption, ProofKind>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+
+#[derive(Debug, Clone)]
 pub enum ProofKind {
     Assumption(ProofAssumption),
     Ax(Axiom),
@@ -61,7 +63,7 @@ impl fmt::Display for ProofError {
     }
 }
 impl ProofKind {
-    pub fn formula(&self) -> Result<Formula,ProofError> {
+    pub fn formula(&self) -> Result<Formula, ProofError> {
         match self {
             ProofKind::Assumption(p) => Ok(p.form()),
             ProofKind::Ax(a) => {
@@ -70,13 +72,13 @@ impl ProofKind {
                     Err(e) => Err(ProofError::Type(e)),
                 }
             }
-            ProofKind::ImpIntro(assumption,body) => {
+            ProofKind::ImpIntro(assumption, body) => {
                 Ok(Formula::imp(assumption.form(), body.formula()?))
             }
-            ProofKind::ImpElim(left,right) => {
+            ProofKind::ImpElim(left, right) => {
                 let prem_to_conclusion = left.formula()?;
                 match prem_to_conclusion {
-                    Formula::Imp(prem,conclusion) => {
+                    Formula::Imp(prem, conclusion) => {
                         let right_formula = right.formula()?;
                         if right_formula == *prem {
                             Ok(conclusion.as_ref().clone())
@@ -87,20 +89,20 @@ impl ProofKind {
                     _ => Err(ProofError::ExpectedImplication(prem_to_conclusion)),
                 }
             }
-            ProofKind::AllIntro(var,body) => {
+            ProofKind::AllIntro(var, body) => {
                 Ok(Formula::forall(var.clone(), body.formula()?))
             }
-            ProofKind::AllElim(forall_proof,t) => {
+            ProofKind::AllElim(forall_proof, t) => {
                 let forall_formula = forall_proof.formula()?;
                 match forall_formula {
-                    Formula::Forall(var,form) => {
-                        let sigma: TermSubstitution =HashMap::from([(var.clone(), t.clone())]);
+                    Formula::Forall(var, form) => {
+                        let sigma: TermSubstitution = HashMap::from([(var.clone(), t.clone())]);
                         match form.subst(&sigma) {
                             Ok(subs) => Ok(subs),
                             Err(e) => Err(ProofError::Type(e)),
                         }
                     }
-                     _ => Err(ProofError::ExpectedForall(forall_formula)),
+                    _ => Err(ProofError::ExpectedForall(forall_formula)),
                 }
             }
         }
@@ -110,7 +112,7 @@ impl ProofKind {
             ProofKind::Assumption(p) => {
                 HashSet::from([p.clone()])
             }
-            ProofKind::Ax(_) => {HashSet::new()}
+            ProofKind::Ax(_) => { HashSet::new() }
             ProofKind::ImpIntro(u, m) => {
                 let mut set = m.free_assumptions();
                 set.remove(u);
@@ -121,11 +123,68 @@ impl ProofKind {
                 set.extend(n.free_assumptions());
                 set
             }
-            ProofKind::AllIntro(_var,m) => {
+            ProofKind::AllIntro(_var, m) => {
                 m.free_assumptions()
             }
             ProofKind::AllElim(m, _) => {
                 m.free_assumptions()
+            }
+        }
+    }
+}
+pub fn free_assumptions(set: HashSet<ProofKind>) -> HashSet<ProofAssumption> {
+    let mut h = HashSet::new();
+    for proof in set {
+        h.extend(proof.free_assumptions())
+    }
+    h
+}
+pub fn free_assumptions_of_substitution(sigma: &ProofKindSubstitution) -> HashSet<ProofAssumption> {
+    let mut set = HashSet::new();
+    for (_,p) in sigma {
+        set.extend(p.free_assumptions());
+    }
+    set
+}
+
+impl ProofKind {
+pub fn subst_assumption(&self, sigma: &ProofKindSubstitution) -> Self {
+        match self {
+            ProofKind::Assumption(p) => {
+                match sigma.get(p) {
+                    Some(proof) => proof.clone(),
+                    None => {self.clone()}
+                }
+            }
+            ProofKind::Ax(_) => {self.clone()},
+            ProofKind::ImpElim(m, n) => {
+                ProofKind::ImpElim(Box::new(m.subst_assumption(sigma)),
+                                   Box::new(n.subst_assumption(sigma)))
+            }
+            ProofKind::ImpIntro(u, m) => {
+                let mut sigma_wo_assumption = sigma.clone();
+                sigma_wo_assumption.remove(u);
+                let set_free_assumptions =
+                    free_assumptions_of_substitution(&sigma_wo_assumption);
+                if set_free_assumptions.contains(u) {
+                    let mut forbidden = m.free_assumptions();
+                    forbidden.remove(u);
+                    forbidden.extend(set_free_assumptions);
+                    let fresh_assumption = new_assumption(&u.form(), forbidden);
+                    sigma_wo_assumption
+                        .insert(u.clone(), ProofKind::Assumption(fresh_assumption.clone()));
+                    ProofKind::ImpIntro(fresh_assumption,
+                                        Box::new(m.subst_assumption(&sigma_wo_assumption)))
+                } else {
+                    ProofKind::ImpIntro(u.clone(),
+                                        Box::new(m.subst_assumption(&sigma_wo_assumption)))
+                }
+            }
+            ProofKind::AllIntro(var,body) => {
+                ProofKind::AllIntro(var.clone(),Box::new(body.subst_assumption(sigma)))
+            }
+            ProofKind::AllElim(a,t) => {
+                ProofKind::AllElim(Box::new(a.subst_assumption(sigma)),t.clone())
             }
         }
     }
@@ -209,7 +268,87 @@ impl ProofKind {
             }
         }
     }
+    pub fn subst(&self, sigma: &TermSubstitution) -> Result<Self,TypeError> {
+        match self {
+            ProofKind::Assumption(p) => {
+                Ok(ProofKind::Assumption(p.subst(sigma)?))
+            }
+            ProofKind::Ax(ax) => {
+                Ok(ProofKind::Ax(ax.subst(sigma)?))
+            }
+            ProofKind::ImpIntro(u, m) => {
+                Ok(ProofKind::ImpIntro(u.subst(sigma)?,Box::new(m.subst(sigma)?)))
+            }
+            ProofKind::ImpElim(m, n) => {
+                Ok(ProofKind::ImpElim(Box::new(m.subst(sigma)?),Box::new(n.subst(sigma)?)))
+            }
+            ProofKind::AllElim(m,t) => {
+                Ok(ProofKind::AllElim(Box::new(m.subst(sigma)?),t.subst(sigma)?))
+            }
+            ProofKind::AllIntro(var,m) => {
+                let mut sigma_wo_var = sigma.clone();
+                sigma_wo_var.remove(var);
+                let set_fv = free_vars_of_term_substitution(&sigma_wo_var);
+                if set_fv.contains(var) {
+                    let mut forbidden = m.free_vars();
+                    forbidden.remove(var);
+                    forbidden.extend(set_fv);
+                    let fresh_var = new_var(var.ty(), forbidden);
+                    sigma_wo_var.insert(var.clone(), Term::var(&fresh_var));
+                    Ok(ProofKind::AllIntro(fresh_var,Box::new(m.subst(&sigma_wo_var)?)))
+                } else {
+                    Ok(ProofKind::AllIntro(var.clone(),Box::new(m.subst(&sigma_wo_var)?)))
+                }
+            }
+        }
+    }
 }
+impl PartialEq for ProofKind {
+    fn eq(&self, other: &Self) -> bool {
+        match (self,other) {
+            (ProofKind::Assumption(p1), ProofKind::Assumption(p2)) => {p1==p2}
+            (ProofKind::Ax(a1), ProofKind::Ax(a2)) => {a1 == a2}
+            (ProofKind::ImpElim(m1,n1),
+                ProofKind::ImpElim(m2,n2)) => {
+                m1 == m2 && n1 == n2
+            }
+            (ProofKind::ImpIntro(u1, m1),
+                ProofKind::ImpIntro(u2,m2)) => {
+                if u1.form() != u2.form() {
+                    return false;
+                }
+                let mut set = m1.free_assumptions();
+                set.extend(m2.free_assumptions());
+                let fresh_assumption = new_assumption(&u1.form(), set);
+                let sigma_1: ProofKindSubstitution = HashMap::from(
+                    [(u1.clone(),ProofKind::Assumption(fresh_assumption.clone()))]);
+                let sigma_2: ProofKindSubstitution = HashMap::from(
+                    [(u2.clone(),ProofKind::Assumption(fresh_assumption.clone()))]);
+                m1.subst_assumption(&sigma_1) == m2.subst_assumption(&sigma_2)
+            }
+            (ProofKind::AllElim(m1,t1),
+                ProofKind::AllElim(m2,t2)) => {
+                m1 == m2 && t1 == t2
+            }
+            (ProofKind::AllIntro(var1,m1),
+                ProofKind::AllIntro(var2,m2)) => {
+                if var1.ty() != var2.ty() {
+                    return false;
+                }
+                let mut set = m1.free_vars();
+                set.extend(m2.free_vars());
+                let fresh_var = new_var(var1.ty(), set);
+                let sigma_1: TermSubstitution =
+                    HashMap::from([(var1.clone(),Term::var(&fresh_var))]);
+                let sigma_2: TermSubstitution =
+                    HashMap::from([(var2.clone(),Term::var(&fresh_var))]);
+                m1.subst(&sigma_1) == m2.subst(&sigma_2)
+            }
+            _ => false,
+        }
+    }
+}
+impl Eq for ProofKind {}
 
 #[cfg(test)]
 mod tests {
@@ -349,5 +488,72 @@ mod tests {
         let expected = HashSet::from([p, y]);
 
         assert_eq!(proof.free_vars_in_assumptions(), expected);
+    }
+    #[test]
+    fn subst_replaces_free_variable_in_assumption() {
+        let alpha = Types::TypeVar(0);
+
+        let x = ObjVar::new(0, alpha.clone());
+        let y = ObjVar::new(1, alpha.clone());
+
+        let p = ObjVar::new(2, Types::arr(alpha.clone(), Types::Boolean));
+
+        let px = Term::app(&Term::var(&p), &Term::var(&x)).unwrap();
+        let py = Term::app(&Term::var(&p), &Term::var(&y)).unwrap();
+
+        let u = ProofAssumption::new(0, Formula::Atom(px));
+        let proof = ProofKind::Assumption(u);
+
+        let sigma: TermSubstitution =
+            HashMap::from([(x.clone(), Term::var(&y))]);
+
+        let result = proof.subst(&sigma).unwrap();
+
+        let expected =
+            ProofKind::Assumption(ProofAssumption::new(0, Formula::Atom(py)));
+        println!("{:?}",result.formula().unwrap());
+        assert_eq!(result, expected);
+    }
+    #[test]
+    fn subst_all_intro_keeps_binder_when_no_capture_is_possible() {
+        let alpha = Types::TypeVar(0);
+
+        let x = ObjVar::new(0, alpha.clone());
+        let y = ObjVar::new(1, alpha.clone());
+        let z = ObjVar::new(2, alpha.clone());
+
+        let p = ObjVar::new(0, Types::arr(alpha.clone(), Types::Boolean));
+
+        let py = Term::app(&Term::var(&p), &Term::var(&y)).unwrap();
+        // py: (((ξ0 ⇒ 𝔹))_0 (ξ0)_1)
+
+        let proof = ProofKind::AllIntro(
+            x.clone(),
+            Box::new(ProofKind::Assumption(
+                ProofAssumption::new(0, Formula::Atom(py)),
+            )),
+        );
+        // proof: (λ (ξ0)_0. u_0) with formula (∀ (ξ0)_0. (((ξ0 ⇒ 𝔹))_0 (ξ0)_1))
+
+        let sigma: TermSubstitution =
+            HashMap::from([(y.clone(), Term::var(&z))]);
+
+        let result = proof.subst(&sigma).unwrap();
+
+        match result {
+            ProofKind::AllIntro(bound, body) => {
+                assert_eq!(bound, x);
+
+                let expected_pz =
+                    Term::app(&Term::var(&p), &Term::var(&z)).unwrap();
+
+                let expected = ProofKind::Assumption(
+                    ProofAssumption::new(0, Formula::Atom(expected_pz)),
+                );
+
+                assert_eq!(*body, expected);
+            }
+            _ => panic!("expected AllIntro"),
+        }
     }
 }

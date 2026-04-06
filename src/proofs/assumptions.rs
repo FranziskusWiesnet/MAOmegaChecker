@@ -1,6 +1,8 @@
+use std::collections::HashSet;
 use std::fmt;
 use crate::formulas::Formula;
-use crate::types::TypeSubstitution;
+use crate::terms::{TermSubstitution};
+use crate::types::{TypeError, TypeSubstitution};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ProofAssumption {
@@ -25,7 +27,26 @@ impl ProofAssumption {
             form: self.form.clone().subst_type(sigma),
         }
     }
+    pub fn subst(&self, sigma: &TermSubstitution) -> Result<Self, TypeError> {
+        Ok(Self {
+            id: self.id,
+            form: self.form.clone().subst(sigma)?,
+        })
+    }
     pub fn new(id: usize, form: Formula) -> Self {
         Self {id, form}
     }
+}
+pub fn new_assumption(formula: &Formula, h: HashSet<ProofAssumption>) -> ProofAssumption {
+    let set_id: HashSet<usize> = h
+        .iter()
+        .cloned()
+        .filter(|v| v.form == *formula)
+        .map(|v| v.id)
+        .collect();
+    let mut id = 0;
+    while set_id.contains(&id) {
+        id += 1;
+    }
+    ProofAssumption::new(id, formula.clone())
 }

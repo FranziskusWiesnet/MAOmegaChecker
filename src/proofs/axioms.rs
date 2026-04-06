@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use crate::formulas::Formula;
-use crate::terms::{new_var, Const, ObjVar, Term, TermSubstitution};
-
+use crate::terms::{new_var, Const, ObjVar, Term, TermKind, TermSubstitution};
+use crate::terms::typed_terms::free_vars_of_term_substitution;
 use crate::types::{TypeError, TypeSubstitution, Types};
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum Axiom {
     AxTrue,
     BotIntro,
@@ -133,7 +133,58 @@ impl Axiom {
         }
         set
     }
+    pub fn subst(&self, sigma: &TermSubstitution) -> Result<Self,TypeError> {
+        match self {
+            Axiom::AxTrue => Ok(Axiom::AxTrue),
+            Axiom::BotIntro => Ok(Axiom::BotIntro),
+            Axiom::Case(b, form) => {
+                let mut sigma_wo_var = sigma.clone();
+                sigma_wo_var.remove(b);
+                let set_fv = free_vars_of_term_substitution(&sigma_wo_var);
+                if set_fv.contains(b) {
+                    let mut forbidden = form.free_vars();
+                    forbidden.extend(set_fv);
+                    let fresh_var = new_var(b.ty(), forbidden);
+                    sigma_wo_var.insert(b.clone(), Term::var(&fresh_var));
+                    Ok(Axiom::Case(fresh_var,form.subst(&sigma_wo_var)?))
+                } else {
+                    Ok(Axiom::Case(b.clone(), form.subst(&sigma_wo_var)?))
+                }
+            }
+            Axiom::Ind(var, form) => {
+                let mut sigma_wo_var = sigma.clone();
+                sigma_wo_var.remove(var);
+                let set_fv = free_vars_of_term_substitution(&sigma_wo_var);
+                if set_fv.contains(var) {
+                    let mut forbidden = form.free_vars();
+                    forbidden.extend(set_fv);
+                    let fresh_var = new_var(var.ty(), forbidden);
+                    sigma_wo_var.insert(var.clone(), Term::var(&fresh_var));
+                    Ok(Axiom::Ind(fresh_var,form.subst(&sigma_wo_var)?))
+                } else {
+                    Ok(Axiom::Ind(var.clone(), form.subst(&sigma_wo_var)?))
+                }
+            }
+        }
+    }
 }
+impl PartialEq for Axiom {
+    fn eq(&self, other: &Axiom) -> bool {
+        match (self,other) {
+            (Axiom::AxTrue,Axiom::AxTrue) => true,
+            (Axiom::BotIntro,Axiom::BotIntro) => true,
+            (Axiom::Case(b0,a0),Axiom::Case(b1,a1)) => {
+            Formula::forall(b0.clone(),a0.clone()) == Formula::forall(b1.clone(),a1.clone())
+            }
+            (Axiom::Ind(var0,a0),Axiom::Ind(var1,a1)) => {
+                Formula::forall(var0.clone(),a0.clone()) == Formula::forall(var1.clone(),a1.clone())
+            }
+            _ => false,
+        }
+    }
+}
+impl Eq for Axiom {}
+
 
 #[cfg(test)]
 mod tests {

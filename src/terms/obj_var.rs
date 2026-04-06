@@ -59,6 +59,9 @@ impl ObjVar {
             name: self.name.clone(),
         }
     }
+    pub fn subst_type_with_env(&self, sigma: &TypeSubstitution, env: &mut HashSet<ObjVar>) -> Self {
+        todo!()
+    }
 }
 pub fn new_var(ty: &Types, h: HashSet<ObjVar>) -> ObjVar {
     let set_id: HashSet<usize> = h
