@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use crate::formulas::Formula;
 use crate::terms::{new_var, ObjVar, Term, TermSubstitution};
 use crate::proofs::axioms::{Axiom};
@@ -306,8 +307,11 @@ pub fn subst_assumption(&self, sigma: &ProofKindSubstitution) -> Self {
 impl PartialEq for ProofKind {
     fn eq(&self, other: &Self) -> bool {
         match (self,other) {
-            (ProofKind::Assumption(p1), ProofKind::Assumption(p2)) => {p1==p2}
-            (ProofKind::Ax(a1), ProofKind::Ax(a2)) => {a1 == a2}
+            (ProofKind::Assumption(p1),
+                ProofKind::Assumption(p2)) => {
+                p1==p2
+            }
+            (ProofKind::Ax(a1), ProofKind::Ax(a2)) => a1 == a2,
             (ProofKind::ImpElim(m1,n1),
                 ProofKind::ImpElim(m2,n2)) => {
                 m1 == m2 && n1 == n2
@@ -349,6 +353,85 @@ impl PartialEq for ProofKind {
     }
 }
 impl Eq for ProofKind {}
+impl Hash for ProofKind {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let mut term_env: HashMap<ObjVar, usize> = HashMap::new();
+        let mut assumption_env: HashMap<ProofAssumption, usize> = HashMap::new();
+        self.hash_rec(state, &mut term_env, &mut assumption_env, 0, 0);
+    }
+}
+impl ProofKind {
+    fn hash_rec<H: Hasher>(
+        &self,
+        state: &mut H,
+        term_env: &mut HashMap<ObjVar, usize>,
+        assumption_env: &mut HashMap<ProofAssumption, usize>,
+        term_depth: usize,
+        assumption_depth: usize,
+    ) {
+        match self {
+            ProofKind::Assumption(u) => {
+                0u8.hash(state);
+                if let Some(binder_depth) = assumption_env.get(u) {
+                    0u8.hash(state);
+                    (assumption_depth - 1 - binder_depth).hash(state);
+                    u.form().hash(state);
+                } else {
+                    1u8.hash(state);
+                    u.hash(state);
+                }
+            }
+            ProofKind::Ax(a) => {
+                1u8.hash(state);
+                a.hash(state);
+            }
+            ProofKind::ImpIntro(u, body) => {
+                2u8.hash(state);
+                u.form().hash(state);
+
+                let old = assumption_env.insert(u.clone(), assumption_depth);
+                body.hash_rec(state, term_env, assumption_env, term_depth,
+                              assumption_depth + 1);
+
+                match old {
+                    Some(prev) => {
+                        assumption_env.insert(u.clone(), prev);
+                    }
+                    None => {
+                        assumption_env.remove(u);
+                    }
+                }
+            }
+            ProofKind::ImpElim(m, n) => {
+                3u8.hash(state);
+                m.hash_rec(state, term_env, assumption_env, term_depth, assumption_depth);
+                n.hash_rec(state, term_env, assumption_env, term_depth, assumption_depth);
+            }
+            ProofKind::AllIntro(x, body) => {
+                4u8.hash(state);
+                x.ty().hash(state);
+
+                let old = term_env.insert(x.clone(), term_depth);
+                body.hash_rec(state, term_env, assumption_env, term_depth + 1,
+                              assumption_depth);
+
+                match old {
+                    Some(prev) => {
+                        term_env.insert(x.clone(), prev);
+                    }
+                    None => {
+                        term_env.remove(x);
+                    }
+                }
+            }
+            ProofKind::AllElim(m, t) => {
+                5u8.hash(state);
+                m.hash_rec(state, term_env, assumption_env, term_depth, assumption_depth);
+                t.hash(state);
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

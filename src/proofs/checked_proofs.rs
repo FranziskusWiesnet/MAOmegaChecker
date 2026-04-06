@@ -7,7 +7,7 @@ use crate::proofs::ProofAssumption;
 use crate::terms::{ObjVar, Term, TermSubstitution};
 use crate::types::TypeSubstitution;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Proof {
     formula: Formula,
     kind: ProofKind,

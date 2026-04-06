@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use crate::formulas::Formula;
 use crate::terms::{new_var, Const, ObjVar, Term, TermKind, TermSubstitution};
 use crate::terms::typed_terms::free_vars_of_term_substitution;
@@ -184,6 +185,27 @@ impl PartialEq for Axiom {
     }
 }
 impl Eq for Axiom {}
+
+impl Hash for Axiom {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Axiom::AxTrue => {
+                0u8.hash(state);
+            }
+            Axiom::BotIntro => {
+                1u8.hash(state);
+            }
+            Axiom::Case(b, a) => {
+                2u8.hash(state);
+                Formula::forall(b.clone(), a.clone()).hash(state);
+            }
+            Axiom::Ind(var, a) => {
+                3u8.hash(state);
+                Formula::forall(var.clone(), a.clone()).hash(state);
+            }
+        }
+    }
+}
 
 
 #[cfg(test)]
