@@ -82,11 +82,50 @@ impl Formula {
             }
             Formula::Bottom => HashSet::new()
         }
-
+    }
+    pub fn used_var_names(&self) -> HashSet<ObjVar> {
+        match self {
+            Formula::Atom(t) => t.used_var_names(),
+            Formula::Imp(prem, conclusion) => {
+                let mut set = prem.used_var_names();
+                set.extend(conclusion.used_var_names());
+                set
+            }
+            Formula::Forall(var, body) => {
+                let mut set = body.used_var_names();
+                set.insert(var.clone());
+                set
+            }
+            Formula::Bottom => HashSet::new()
+        }
     }
 }
 
 impl Formula {
+    pub fn subst_type_with_map(&self,
+                               sigma: &TypeSubstitution,
+                               var_subst: &HashMap<ObjVar,ObjVar>) -> Self {
+        match self {
+            Formula::Atom(t) => {
+                Formula::Atom(t.subst_type_with_map(sigma, var_subst))
+            }
+            Formula::Imp(a, b) => Formula::Imp(
+                Box::new(a.subst_type_with_map(sigma, var_subst)),
+                Box::new(b.subst_type_with_map(sigma, var_subst)),
+            ),
+
+            Formula::Forall(v, f) =>
+                match var_subst.get(v) {
+                    Some(var) =>
+                        Formula::Forall(var.clone(),
+                                        Box::new(f.subst_type_with_map(sigma, var_subst))),
+                    None => Formula::Forall(v.clone(),
+                                            Box::new(f.subst_type_with_map(sigma, var_subst)))
+                }
+            Formula::Bottom => Formula::Bottom,
+        }
+    }
+
     pub fn subst_type(&self, sigma: &TypeSubstitution) -> Formula {
         match self {
             Formula::Atom(t) => Formula::Atom(t.subst_type(sigma)),
@@ -147,6 +186,7 @@ impl Formula {
         }
     }
 }
+
 impl PartialEq for Formula {
     fn eq(&self, other: &Formula) -> bool {
         match (self,other) {

@@ -5,6 +5,8 @@ use crate::types::TypeSubstitution;
 use crate::terms::ObjVar;
 use crate::terms::Const;
 use crate::terms::new_var;
+use crate::terms::obj_var::substitution_map;
+
 pub type TermKindSubstitution = HashMap<ObjVar, TermKind>;
 
 
@@ -69,18 +71,54 @@ impl TermKind {
             }
         }
     }
-    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
+    pub fn used_var_names(&self) -> HashSet<ObjVar> {
+        let mut set = HashSet::new();
         match self {
-            TermKind::Var(v) => TermKind::Var(v.subst_type(sigma)),
+            TermKind::Var(u) => {set.insert(u.clone());}
+            TermKind::Const(_) => {}
+            TermKind::Abs(x, t) => {
+                set.insert(x.clone());
+            set.extend(t.used_var_names());
+            }
+            TermKind::App(s, t) => {
+                set.extend(s.used_var_names());
+                set.extend(t.used_var_names());
+            }
+        }
+        set
+    }
+    pub fn subst_type_with_map(&self,
+                               sigma: &TypeSubstitution,
+                               var_subst: &HashMap<ObjVar,ObjVar>)
+        -> Self {
+        match self {
+            TermKind::Var(v) => {
+                match var_subst.get(v) {
+                    Some(x) => TermKind::Var(x.clone()),
+                    None => TermKind::Var(v.clone()),
+                }
+            },
             TermKind::Const(c) => TermKind::Const(c.subst_type(sigma)),
             TermKind::App(fun, arg) => {
-                TermKind::app(fun.subst_type(sigma),arg.subst_type(sigma))
+                TermKind::app(fun.subst_type_with_map(sigma,var_subst),
+                              arg.subst_type_with_map(sigma,var_subst))
             }
             TermKind::Abs(v, body) => {
-                TermKind::abs(v.subst_type(sigma),body.subst_type(sigma))
+                match var_subst.get(v) {
+                    Some(x) => TermKind::abs(x.clone(),body.subst_type_with_map(sigma,var_subst)),
+                    None =>  TermKind::abs(v.clone(),body.subst_type_with_map(sigma,var_subst))
+                }
+
             }
         }
     }
+
+    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
+        let used_vars = self.used_var_names();
+        let var_subst = substitution_map(&used_vars,&sigma);
+        self.subst_type_with_map(sigma, &var_subst)
+    }
+
     pub fn subst(&self, sigma: &TermKindSubstitution) -> Self {
         match self {
             TermKind::Var(v) => match sigma.get(v) {
@@ -218,6 +256,75 @@ mod tests {
         );
 
         assert_eq!(t.free_type_vars(), HashSet::from([0, 1, 2]));
+    }
+    #[test]
+    fn subst_type_avoids_collision_between_two_free_variables() {
+        let alpha = Types::TypeVar(0);
+        let nat = Types::Nat;
+
+        let x_alpha = ObjVar::new(0, alpha.clone());
+        let x_nat   = ObjVar::new(0, nat.clone());
+
+        let term = TermKind::App(
+            Box::new(TermKind::Var(x_alpha.clone())),
+            Box::new(TermKind::Var(x_nat.clone())),
+        );
+
+        let sigma: TypeSubstitution = HashMap::from([
+            (0, nat.clone()),
+        ]);
+
+        let result = term.subst_type(&sigma);
+        match result {
+            TermKind::App(left, right) => {
+                match (left.as_ref(), right.as_ref()) {
+                    (TermKind::Var(v1), TermKind::Var(v2)) => {
+
+                        assert_ne!(v1, v2);
+
+                        assert_eq!(v2, &x_nat);
+
+                        assert_eq!(v1.ty(), &nat);
+                    }
+                    _ => panic!("expected two variables"),
+                }
+            }
+            _ => panic!("expected application"),
+        }
+    }
+    #[test]
+    fn subst_type_avoids_collision_with_bound_variable() {
+        let alpha = Types::TypeVar(0);
+        let nat = Types::Nat;
+
+        let x_alpha = ObjVar::new(0, alpha.clone());
+        let x_nat   = ObjVar::new(0, nat.clone());
+
+        let term = TermKind::Abs(
+            x_alpha.clone(),
+            Box::new(TermKind::Var(x_nat.clone())),
+        );
+
+        let sigma: TypeSubstitution = HashMap::from([
+            (0, nat.clone()),
+        ]);
+
+        let result = term.subst_type(&sigma);
+
+        match result {
+            TermKind::Abs(bound, body) => {
+                assert_eq!(bound.ty(), &nat);
+
+                match body.as_ref() {
+                    TermKind::Var(v) => {
+                        assert_eq!(v, &x_nat);
+                        assert_ne!(&bound, v);
+                    }
+                    _ => panic!("expected variable in body"),
+                }
+            }
+            _ => panic!("expected abstraction"),
+        }
     }
     #[test]
     fn free_vars_of_substitution_collects_free_variables_with_abstraction() {

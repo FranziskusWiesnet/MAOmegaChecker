@@ -4,11 +4,11 @@ use crate::formulas::Formula;
 use crate::proofs::axioms::Axiom;
 use crate::proofs::proof_kind::{ProofError, ProofKind};
 use crate::proofs::ProofAssumption;
-use crate::terms::{ObjVar, Term, TermSubstitution};
-use crate::types::TypeSubstitution;
+use crate::terms::{new_var, ObjVar, Term, TermSubstitution};
+use crate::types::{TypeSubstitution, Types};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Proof {
+struct Proof {
     formula: Formula,
     kind: ProofKind,
 }
@@ -127,7 +127,59 @@ impl Proof {
         Proof::imp_elim(Proof::imp_elim(
             Proof::all_elim(ax,Term::var(&x))?,proof_base)?,proof_step)
     }
+    pub fn efq (form: &Formula) -> Self {
+        match form {
+            Formula::Bottom => {Self {
+                formula: Formula::imp(Formula::falsum(),Formula::Bottom),
+                kind: ProofKind::Ax(Axiom::BotIntro)
+            }}
+            Formula::Atom(t) => {
+                let fv = t.free_vars();
+                let b = new_var(&Types::Boolean,fv);
+
+                Self {
+                    formula: Formula::imp(Formula::falsum(),Formula::Atom(t.clone())),
+                    kind: ProofKind::ImpElim(
+                        Box::new(ProofKind::AllElim(Box::new(ProofKind::Ax(Axiom::Case(b.clone(),Formula::Atom(Term::var(&b))))),t.clone())),
+                        Box::new(ProofKind::Ax(Axiom::AxTrue))
+                    )
+                }
+            }
+            Formula::Imp(premise, conclusion) => {
+                let assumption_f = ProofAssumption::new(0,Formula::falsum());
+                let assumption_premise = ProofAssumption::new(0,premise.as_ref().clone());
+                let proof_conclusion = Proof::efq(conclusion);
+                Self {
+                    formula: Formula::imp(Formula::falsum(),form.clone()),
+                    kind:
+                    ProofKind::ImpIntro(
+                        assumption_f.clone(),
+                        Box::new(ProofKind::ImpIntro(
+                            assumption_premise,
+                            Box::new(ProofKind::ImpElim(
+                                Box::new(proof_conclusion.kind),
+                                Box::new(ProofKind::Assumption(assumption_f)))))))
+                }
+            }
+            Formula::Forall(var, body) => {
+                let assumption_f = ProofAssumption::new(0,Formula::falsum());
+                let proof_body = Proof::efq(body);
+                Self {
+                    formula: Formula::imp(Formula::falsum(),form.clone()),
+                    kind:
+                    ProofKind::ImpIntro(
+                        assumption_f.clone(),
+                        Box::new(ProofKind::AllIntro(
+                            var.clone(),
+                            Box::new(ProofKind::ImpElim(
+                                Box::new(proof_body.kind),
+                                Box::new(ProofKind::Assumption(assumption_f)))))))
+                }
+            }
+        }
+    }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293,7 +345,11 @@ mod tests {
             proof_base,
             proof_step,
         ).unwrap();
-        let proof = Proof::all_intro(n.clone(), Proof::imp_intro(assumption_base,Proof::imp_intro(assumption_step, proof_part))).unwrap();
+        let proof = Proof::all_intro(n.clone(),
+                                     Proof::imp_intro(assumption_base,
+                                                      Proof::imp_intro(assumption_step,
+                                                                       proof_part)))
+            .unwrap();
 
 
         assert_eq!(proof.formula.to_string(),
@@ -342,18 +398,49 @@ mod tests {
         let proof_base = Proof::from_assumption(
             ProofAssumption::new(0, p_nil.clone()),
         );
-        println!("{}", proof_base.formula);
+
         let proof_step = Proof::from_assumption(
             ProofAssumption::new(1, step_formula.clone()),
         );
-        println!("{}", proof_step.formula);
+
         let proof = Proof::induction(
             xs.clone(),
             pxs.clone(),
             proof_base,
             proof_step,
-        );
-        println!("{}", proof.unwrap());
+        ).unwrap();
+        assert_eq!(proof.to_string(),"(((𝓘𝓷𝓭(xs.(P xs)) xs) u_0) u_1)")
+    }
+    #[test]
+    fn efq_of_atom(){
+        let b = ObjVar::with_name(0, Types::Boolean, "b");
+        let b_form = Formula::atom(&Term::var(&b)).unwrap();
+        let proof = Proof::efq(&b_form);
 
+        assert_eq!(proof.kind.formula().unwrap(),proof.formula);
+    }
+    #[test]
+    fn efq_of_implication(){
+        let p = ObjVar::with_name(0, Types::Boolean, "P");
+        let p_form = Formula::atom(&Term::var(&p)).unwrap();
+        let q = ObjVar::with_name(0, Types::Boolean, "Q");
+        let q_form = Formula::atom(&Term::var(&q)).unwrap();
+        let proof = Proof::efq(&Formula::imp(p_form,q_form));
+        assert_eq!(proof.kind.formula().unwrap(),proof.formula);
+    }
+    #[test]
+    fn efq_of_universal_formula(){
+        let p = ObjVar::with_name(0, Types::arr(Types::Nat,Types::Boolean), "P");
+        let q = ObjVar::with_name(1, Types::arr(Types::Nat,Types::Boolean), "Q");
+        let n = ObjVar::with_name(2, Types::Nat, "n");
+        let pn = Term::app(&Term::var(&p), &Term::var(&n)).unwrap();
+        let qn = Term::app(&Term::var(&q), &Term::var(&n)).unwrap();
+        let pn_form = Formula::atom(&pn).unwrap();
+        let qn_form = Formula::atom(&qn).unwrap();
+        let formula = Formula::forall(n,Formula::imp(pn_form,qn_form));
+        let proof = Proof::efq(&formula);
+        // println!("{}", proof);
+        // (λ u_0. (λ n. ((λ u_0. (λ u_0. (((𝒞((𝔹)_0.(𝔹)_0) (Q n)) AxT) u_0))) u_0)))
+        assert_eq!(proof.kind.formula().unwrap(),proof.formula);
     }
 }

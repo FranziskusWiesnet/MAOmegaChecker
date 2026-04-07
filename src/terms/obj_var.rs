@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use crate::types::{TypeSubstitution, Types};
@@ -59,9 +59,6 @@ impl ObjVar {
             name: self.name.clone(),
         }
     }
-    pub fn subst_type_with_env(&self, sigma: &TypeSubstitution, env: &mut HashSet<ObjVar>) -> Self {
-        todo!()
-    }
 }
 pub fn new_var(ty: &Types, h: HashSet<ObjVar>) -> ObjVar {
     let set_id: HashSet<usize> = h
@@ -75,6 +72,20 @@ pub fn new_var(ty: &Types, h: HashSet<ObjVar>) -> ObjVar {
         id += 1;
     }
     ObjVar::new(id, ty.clone())
+}
+
+pub fn substitution_map(used_vars: &HashSet<ObjVar>,sigma: &TypeSubstitution) -> HashMap<ObjVar,ObjVar> {
+    let mut forbidden = used_vars.clone();
+    let mut rho: HashMap<ObjVar, ObjVar> = HashMap::new();
+    for v in used_vars {
+        let new_ty = v.ty.subst(sigma);
+        if new_ty != v.ty {
+            let fresh_var = new_var(&new_ty, forbidden.clone());
+            forbidden.insert(fresh_var.clone());
+            rho.insert(v.clone(), fresh_var);
+        }
+    }
+    rho
 }
 
 #[cfg(test)]

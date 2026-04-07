@@ -93,6 +93,7 @@ impl Term {
     pub fn free_var(&self) -> HashSet<ObjVar> {
         self.kind.free_vars()
     }
+    pub fn used_var_names(&self) -> HashSet<ObjVar> {self.kind.used_var_names()}
 }
 
 
@@ -118,6 +119,14 @@ impl Term {
         Self {
             ty: self.ty.subst(sigma),
             kind: self.kind.subst_type(sigma),
+        }
+    }
+    pub fn subst_type_with_map(&self, 
+                               sigma: &TypeSubstitution, 
+                               var_subst: &HashMap<ObjVar,ObjVar>) -> Self {
+        Self {
+            ty: self.ty.subst(sigma),
+            kind: self.kind.subst_type_with_map(sigma,var_subst),
         }
     }
 

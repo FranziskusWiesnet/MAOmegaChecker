@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use crate::formulas::Formula;
-use crate::terms::{new_var, Const, ObjVar, Term, TermKind, TermSubstitution};
+use crate::terms::{new_var, Const, ObjVar, Term, TermSubstitution};
 use crate::terms::typed_terms::free_vars_of_term_substitution;
 use crate::types::{TypeError, TypeSubstitution, Types};
 #[derive(Debug, Clone)]
