@@ -132,6 +132,30 @@ impl ProofKind {
             }
         }
     }
+    pub fn used_assumptions(&self) -> HashSet<ProofAssumption> {
+        match self {
+            ProofKind::Assumption(p) => {
+                HashSet::from([p.clone()])
+            }
+            ProofKind::Ax(_) => { HashSet::new() }
+            ProofKind::ImpIntro(u, m) => {
+                let mut set = m.used_assumptions();
+                set.insert(u.clone());
+                set
+            }
+            ProofKind::ImpElim(m, n) => {
+                let mut set = m.used_assumptions();
+                set.extend(n.used_assumptions());
+                set
+            }
+            ProofKind::AllIntro(_, m) => {
+                m.used_assumptions()
+            }
+            ProofKind::AllElim(m, _) => {
+                m.used_assumptions()
+            }
+        }
+    }
 }
 pub fn free_assumptions(set: HashSet<ProofKind>) -> HashSet<ProofAssumption> {
     let mut h = HashSet::new();

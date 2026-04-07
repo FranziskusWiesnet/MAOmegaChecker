@@ -27,6 +27,7 @@ impl ProofAssumption {
             form: self.form.clone().subst_type(sigma),
         }
     }
+
     pub fn subst(&self, sigma: &TermSubstitution) -> Result<Self, TypeError> {
         Ok(Self {
             id: self.id,

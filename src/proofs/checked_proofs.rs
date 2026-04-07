@@ -6,8 +6,7 @@ use crate::proofs::proof_kind::{ProofError, ProofKind};
 use crate::proofs::ProofAssumption;
 use crate::terms::{new_var, ObjVar, Term, TermSubstitution};
 use crate::types::{TypeSubstitution, Types};
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Proof {
     formula: Formula,
     kind: ProofKind,
@@ -178,6 +177,12 @@ impl Proof {
             }
         }
     }
+}
+pub fn assumption_map_from_type(used_vars: &HashSet<ProofAssumption>,
+                      sigma_type: &TypeSubstitution) -> HashMap<ProofAssumption,ProofAssumption> {
+    let mut forbidden = used_vars.clone();
+    let mut rho: HashMap<ProofAssumption,ProofAssumption> = HashMap::new();
+    todo!()
 }
 
 #[cfg(test)]

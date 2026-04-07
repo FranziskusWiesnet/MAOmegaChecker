@@ -3,6 +3,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use crate::formulas::Formula;
 use crate::terms::{new_var, Const, ObjVar, Term, TermSubstitution};
+use crate::terms::obj_var::substitution_map;
 use crate::terms::typed_terms::free_vars_of_term_substitution;
 use crate::types::{TypeError, TypeSubstitution, Types};
 #[derive(Debug, Clone)]
@@ -108,16 +109,57 @@ impl Axiom {
             }
         }
     }
-    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
+    pub fn used_var_names(&self) -> HashSet<ObjVar> {
+        let mut set = HashSet::new();
+        match self {
+            Axiom::AxTrue => {},
+            Axiom::BotIntro => {},
+            Axiom::Case(b, form) => {
+                set.extend(form.used_var_names());
+                set.insert(b.clone());
+            }
+            Axiom::Ind(var, form) => {
+                set.extend(form.used_var_names());
+                set.insert(var.clone());
+            }
+        }
+        set
+    }
+    pub fn subst_type_with_map(&self,
+                               sigma: &TypeSubstitution,
+                               var_subst: &HashMap<ObjVar,ObjVar>) -> Self {
         match self {
             Axiom::AxTrue => Axiom::AxTrue,
             Axiom::BotIntro => Axiom::BotIntro,
-            Axiom::Case(b, form) => 
-                {Axiom::Case(b.subst_type(sigma), form.subst_type(sigma))}
-            Axiom::Ind(var, form) =>
-                {Axiom::Ind(var.subst_type(sigma), form.subst_type(sigma))}
+            Axiom::Case(b, form) => {
+                match var_subst.get(b) {
+                    Some(var) => {
+                        Axiom::Case(var.clone(), form.subst_type_with_map(sigma, var_subst))
+                    },
+                    None => {
+                        Axiom::Case(b.clone(), form.subst_type_with_map(sigma, var_subst))
+                    },
+                }
+            }
+            Axiom::Ind(v, form) => {
+                match var_subst.get(v) {
+                    Some(var) => {
+                        Axiom::Ind(var.clone(), form.subst_type_with_map(sigma, var_subst))
+                    }
+                    None => {
+                        Axiom::Ind(v.clone(), form.subst_type_with_map(sigma, var_subst))
+                    }
+                }
+            }
         }
     }
+
+    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
+        let used_vars = self.used_var_names();
+        let substitution_map = substitution_map(&used_vars,sigma);
+        self.subst_type_with_map(sigma, &substitution_map)
+    }
+    
     pub fn free_vars(&self) -> HashSet<ObjVar> {
         let mut set = HashSet::new();
         match self {
@@ -134,6 +176,7 @@ impl Axiom {
         }
         set
     }
+
     pub fn subst(&self, sigma: &TermSubstitution) -> Result<Self,TypeError> {
         match self {
             Axiom::AxTrue => Ok(Axiom::AxTrue),
