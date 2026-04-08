@@ -4,7 +4,9 @@ use std::hash::{Hash, Hasher};
 use crate::formulas::Formula;
 use crate::terms::{new_var, ObjVar, Term, TermSubstitution};
 use crate::proofs::axioms::{Axiom};
-use crate::proofs::assumptions::{new_assumption, ProofAssumption};
+use crate::proofs::assumptions::{assumption_map_for_term_subst, assumption_map_for_type_subst, new_assumption, ProofAssumption};
+use crate::proofs::proof_kind::ProofKind::AllElim;
+use crate::terms::obj_var::substitution_map;
 use crate::terms::typed_terms::free_vars_of_term_substitution;
 use crate::types::{TypeError, TypeSubstitution};
 
@@ -247,25 +249,97 @@ pub fn subst_assumption(&self, sigma: &ProofKindSubstitution) -> Self {
             }
         }
     }
-    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self  {
+    pub fn used_var_names(&self) -> HashSet<ObjVar> {
         match self {
-            ProofKind::Assumption(p) => {
-                ProofKind::Assumption(p.subst_type(sigma))
-            }
-            ProofKind::Ax(a) => {ProofKind::Ax(a.subst_type(sigma))}
+            ProofKind::Assumption(p) => p.form().used_var_names(),
+            ProofKind::Ax(a) => a.used_var_names(),
             ProofKind::ImpIntro(u, m) => {
-                ProofKind::ImpIntro(u.subst_type(sigma),Box::new(m.subst_type(sigma)))
-            }
+                let mut set = m.used_var_names();
+                set.extend(u.form().used_var_names());
+                set
+            },
             ProofKind::ImpElim(m, n) => {
-                ProofKind::ImpElim(Box::new(m.subst_type(sigma)),Box::new(n.subst_type(sigma)))
+                let mut set = m.used_var_names();
+                set.extend(n.used_var_names());
+                set
             }
             ProofKind::AllIntro(var,m) => {
-                ProofKind::AllIntro(var.subst_type(sigma),Box::new(m.subst_type(sigma)))
+                let mut set = m.used_var_names();
+                set.insert(var.clone());
+                set
             }
             ProofKind::AllElim(forall_proof,t) => {
-                ProofKind::AllElim(Box::new(forall_proof.subst_type(sigma)), t.subst_type(sigma))
+                let mut set = forall_proof.used_var_names();
+                set.extend(t.used_var_names());
+                set
             }
         }
+    }
+    pub fn subst_type_with_maps(&self,
+                                sigma: &TypeSubstitution,
+                                var_subst: &HashMap<ObjVar,ObjVar>,
+                                assumption_subst: &HashMap<ProofAssumption,ProofAssumption>)
+                                -> Self {
+        match self {
+            ProofKind::Assumption(u) => {
+                match assumption_subst.get(u) {
+                    Some(v) => ProofKind::Assumption(v.clone()),
+                    None => ProofKind::Assumption(u.clone())
+                }
+            }
+            ProofKind::Ax(a) => ProofKind::Ax(a.subst_type_with_map(sigma, var_subst)),
+            ProofKind::ImpIntro(u, m) => {
+                match assumption_subst.get(u) {
+                    Some(v) => {
+                        ProofKind::ImpIntro(v.clone(),
+                                            Box::new(m.subst_type_with_maps(sigma,
+                                                                            var_subst,
+                                                                            assumption_subst)))
+                    }
+                    None => ProofKind::ImpIntro(u.clone(),
+                                                Box::new(m.subst_type_with_maps(sigma,
+                                                                                var_subst,
+                                                                                assumption_subst)))
+                }
+            },
+            ProofKind::ImpElim(m, n) => {
+                ProofKind::ImpElim(Box::new(m.subst_type_with_maps(sigma,
+                                                                   var_subst,
+                                                                   assumption_subst)),
+                                   Box::new(n.subst_type_with_maps(sigma,
+                                                                   var_subst,
+                                                                   assumption_subst)))
+            }
+            ProofKind::AllIntro(var,m) => {
+                match var_subst.get(var) {
+                    Some(new_var) => {
+                        ProofKind::AllIntro(new_var.clone(),
+                                            Box::new(m.subst_type_with_maps(sigma,
+                                                                            var_subst,
+                                                                            assumption_subst)))
+                    }
+                    None => ProofKind::AllIntro(var.clone(),
+                                                Box::new(m.subst_type_with_maps(sigma,
+                                                                                var_subst,
+                                                                                assumption_subst)))
+                }
+            }
+            ProofKind::AllElim(forall_proof,t) => {
+                AllElim(Box::new(forall_proof.subst_type_with_maps(sigma,
+                                                                   var_subst,
+                                                                   assumption_subst)),
+                        t.subst_type_with_map(sigma, var_subst))
+            }
+        }
+    }
+
+    pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self  {
+        let used_vars = self.used_var_names();
+        let used_var_subst = substitution_map(&used_vars,&sigma);
+        let used_assumptions = self.used_assumptions();
+        let used_assumption_map =
+            assumption_map_for_type_subst(&used_assumptions, sigma, &used_var_subst);
+        self.subst_type_with_maps(sigma, &used_var_subst, &used_assumption_map)
     }
     pub fn free_vars(&self) -> HashSet<ObjVar> {
         match self {
@@ -293,22 +367,40 @@ pub fn subst_assumption(&self, sigma: &ProofKindSubstitution) -> Self {
             }
         }
     }
-    pub fn subst(&self, sigma: &TermSubstitution) -> Result<Self,TypeError> {
+
+    pub fn subst_with_map (&self,
+                           sigma: &TermSubstitution,
+                           assumption_map: &HashMap<ProofAssumption,ProofAssumption>) ->
+    Result<Self,TypeError> {
         match self {
-            ProofKind::Assumption(p) => {
-                Ok(ProofKind::Assumption(p.subst(sigma)?))
+            ProofKind::Assumption(u) => {
+                match assumption_map.get(u) {
+                    Some(v) => Ok(ProofKind::Assumption(v.clone())),
+                    None => Ok(ProofKind::Assumption(u.clone()))
+                }
             }
             ProofKind::Ax(ax) => {
                 Ok(ProofKind::Ax(ax.subst(sigma)?))
             }
             ProofKind::ImpIntro(u, m) => {
-                Ok(ProofKind::ImpIntro(u.subst(sigma)?,Box::new(m.subst(sigma)?)))
+                match assumption_map.get(u) {
+                    Some(v) => {
+                        Ok(ProofKind::ImpIntro(
+                            v.clone(),
+                            Box::new(m.subst_with_map(sigma,assumption_map)?)))}
+                    None => Ok(ProofKind::ImpIntro(
+                        u.clone(),
+                        Box::new(m.subst_with_map(sigma,assumption_map)?)))
+                }
             }
             ProofKind::ImpElim(m, n) => {
-                Ok(ProofKind::ImpElim(Box::new(m.subst(sigma)?),Box::new(n.subst(sigma)?)))
+                Ok(ProofKind::ImpElim(
+                    Box::new(m.subst_with_map(sigma,assumption_map)?),
+                             Box::new(n.subst_with_map(sigma,assumption_map)?)))
             }
             ProofKind::AllElim(m,t) => {
-                Ok(ProofKind::AllElim(Box::new(m.subst(sigma)?),t.subst(sigma)?))
+                Ok(ProofKind::AllElim(Box::new(m.subst_with_map(sigma, assumption_map)?),
+                                      t.subst(sigma)?))
             }
             ProofKind::AllIntro(var,m) => {
                 let mut sigma_wo_var = sigma.clone();
@@ -320,12 +412,23 @@ pub fn subst_assumption(&self, sigma: &ProofKindSubstitution) -> Self {
                     forbidden.extend(set_fv);
                     let fresh_var = new_var(var.ty(), forbidden);
                     sigma_wo_var.insert(var.clone(), Term::var(&fresh_var));
-                    Ok(ProofKind::AllIntro(fresh_var,Box::new(m.subst(&sigma_wo_var)?)))
+                    Ok(ProofKind::AllIntro(fresh_var,
+                                           Box::new(m.subst_with_map(&sigma_wo_var,
+                                                                     assumption_map)?)))
                 } else {
-                    Ok(ProofKind::AllIntro(var.clone(),Box::new(m.subst(&sigma_wo_var)?)))
+                    Ok(ProofKind::AllIntro(var.clone(),
+                                           Box::new(m.subst_with_map(&sigma_wo_var,
+                                                                     assumption_map)?)))
                 }
             }
         }
+    }
+
+    pub fn subst(&self, sigma: &TermSubstitution) -> Result<Self,TypeError> {
+        let used_assumptions = self.used_assumptions();
+        let used_assumption_map =
+            assumption_map_for_term_subst(&used_assumptions, &sigma)?;
+        self.subst_with_map(sigma, &used_assumption_map)
     }
 }
 impl PartialEq for ProofKind {

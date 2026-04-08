@@ -1,7 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use crate::formulas::Formula;
-use crate::terms::{TermSubstitution};
+use crate::terms::{ObjVar, TermSubstitution};
 use crate::types::{TypeError, TypeSubstitution};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -51,3 +51,32 @@ pub fn new_assumption(formula: &Formula, h: HashSet<ProofAssumption>) -> ProofAs
     }
     ProofAssumption::new(id, formula.clone())
 }
+pub fn assumption_map_for_type_subst (used_assumption: &HashSet<ProofAssumption>,
+                       sigma: &TypeSubstitution,
+                       var_subst: &HashMap<ObjVar,ObjVar>)
+    -> HashMap<ProofAssumption,ProofAssumption> {
+    let mut forbidden = used_assumption.clone();
+    let mut rho: HashMap<ProofAssumption, ProofAssumption> = HashMap::new();
+    for u in used_assumption {
+        let new_form = u.form.subst_type_with_map(sigma, var_subst);
+        if new_form != u.form {
+            let fresh_assumption = new_assumption(&new_form, forbidden.clone());
+            forbidden.insert(fresh_assumption.clone());
+            rho.insert(u.clone(), fresh_assumption);
+        }
+    }
+    rho
+}
+pub fn assumption_map_for_term_subst (used_assumption: &HashSet<ProofAssumption>,
+                                      sigma: &TermSubstitution)
+    -> Result<HashMap<ProofAssumption,ProofAssumption>, TypeError> {
+    let mut forbidden = used_assumption.clone();
+    let mut rho: HashMap<ProofAssumption, ProofAssumption> = HashMap::new();
+    for u in used_assumption {
+        let new_form = u.form.subst(sigma)?;
+        let fresh_assumption = new_assumption(&new_form, forbidden.clone());
+        forbidden.insert(fresh_assumption.clone());
+        rho.insert(u.clone(), fresh_assumption);
+    }
+    Ok(rho)
+    }

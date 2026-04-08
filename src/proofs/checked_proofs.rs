@@ -1,10 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use crate::formulas::Formula;
+use crate::proofs::assumptions::assumption_map_for_type_subst;
 use crate::proofs::axioms::Axiom;
 use crate::proofs::proof_kind::{ProofError, ProofKind};
 use crate::proofs::ProofAssumption;
 use crate::terms::{new_var, ObjVar, Term, TermSubstitution};
+use crate::terms::obj_var::substitution_map;
 use crate::types::{TypeSubstitution, Types};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Proof {
@@ -106,9 +108,15 @@ impl Proof {
         self.kind.free_type_vars()
     }
     pub fn subst_type(&self, sigma: &TypeSubstitution) -> Self {
+        let mut used_vars = self.formula.used_var_names();
+        used_vars.extend(self.kind.used_var_names());
+        let used_var_subst = substitution_map(&used_vars,&sigma);
+        let used_assumptions = self.kind.used_assumptions();
+        let used_assumption_map =
+            assumption_map_for_type_subst(&used_assumptions, sigma, &used_var_subst);
         Self{
-            formula: self.formula.subst_type(sigma),
-            kind: self.kind.subst_type(sigma)
+            formula: self.formula.subst_type_with_map(sigma,&used_var_subst),
+            kind: self.kind.subst_type_with_maps(sigma, &used_var_subst, &used_assumption_map)
         }
     }
     pub fn free_vars(&self) -> HashSet<ObjVar> {
@@ -177,12 +185,6 @@ impl Proof {
             }
         }
     }
-}
-pub fn assumption_map_from_type(used_vars: &HashSet<ProofAssumption>,
-                      sigma_type: &TypeSubstitution) -> HashMap<ProofAssumption,ProofAssumption> {
-    let mut forbidden = used_vars.clone();
-    let mut rho: HashMap<ProofAssumption,ProofAssumption> = HashMap::new();
-    todo!()
 }
 
 #[cfg(test)]
