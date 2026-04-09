@@ -164,7 +164,7 @@ impl Formula {
                 sigma_wo_var.remove(var);
                 let sigma_kind: TermKindSubstitution =
                     sigma_wo_var.iter()
-                        .map(|(k,t)| (k.clone(),t.kind().clone()))
+                        .map(|(k, t)| (k.clone(), t.kind().clone()))
                         .collect();
                 let set_fv = free_vars_of_substitution(&sigma_kind);
                 if set_fv.contains(&var) {

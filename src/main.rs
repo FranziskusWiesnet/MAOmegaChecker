@@ -8,11 +8,9 @@ mod proofs;
 use crate::types::Types;
 use crate::terms::obj_var::ObjVar;
 use crate::terms::Term;
-use crate::terms::{TermKind, TermKindSubstitution};
 use crate::terms::Const;
 use crate::formulas::{Formula, is_qfree};
 use crate::types::Types::TypeVar;
-use std::collections::HashMap;
 
 
 fn setPrint(formula: &Formula) -> bool {
@@ -68,40 +66,21 @@ fn all(x: &ObjVar, a: &Formula) -> Formula {
 fn main() {
     let bot = Formula::Bottom;
     let F = Formula::Atom(Term::constant(Const::FF));
-    let A: Formula =  Formula::Atom(Term::var(&ObjVar::new(0, Types::Boolean)));
     let xi = TypeVar(0);
-    let x = ObjVar::new(0,xi);
-    let S = all(&x, &imp(&imp(&imp(&A,&F),&F),&A));
-    let AllA = all(&x,&A);
-    let T = imp(&imp(&AllA,&bot),&bot);
-    let StoT = imp(&S,&T);
-    //println!("{}", imp(&T.F(),&T));
+    let q = ObjVar::with_name(0, Types::arr(xi.clone(), Types::Boolean), "Q");
+    let x = ObjVar::with_name(0, xi, "x");
+    let qx = Term::app(&Term::var(&q), &Term::var(&x)).unwrap();
+    let qx_form = Formula::Atom(qx.clone());
+    let S = all(&x, &imp(&imp(&imp(&qx_form, &F), &F), &qx_form));
+    let AllQx = all(&x, &qx_form);
+    let T = imp(&imp(&AllQx, &bot), &bot);
+    let StoT = imp(&S, &T);
+
     println!("{StoT}");
     println!("{}", setD(&StoT));
-    let B = imp(&imp(&A,&bot),&bot);
+    let B = imp(&imp(&qx_form, &bot), &bot);
     println!("{B}");
     println!("{}", setG(&B));
     println!("{}", setD(&B));
 
-    let _x = ObjVar::new(0, Types::Boolean);
-    let _y = ObjVar::new(1, Types::Boolean);
-    let _z = ObjVar::new(2, Types::Boolean);
-    let x = ObjVar::with_name(0, Types::Boolean, "x");
-    let y = ObjVar::with_name(1, Types::Boolean, "y");
-
-    let t = TermKind::abs(
-        y.clone(),
-        TermKind::Var(x.clone()),
-    );
-
-    let mut sigma: TermKindSubstitution = HashMap::new();
-    sigma.insert(x.clone(), TermKind::Var(y.clone()));
-
-    println!("t     = {}", t);
-    for (v, s) in &sigma {
-        println!("sigma = {} ↦ {}", v, s);
-    }
-
-    let result = t.subst(&sigma);
-    println!("tσ    = {}", result);
 }

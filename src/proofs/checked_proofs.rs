@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn from_assumption_builds_proof_with_same_formula() {
-        let u = ProofAssumption::new(0, Formula::verum());
+        let u = ProofAssumption::with_name(0, Formula::verum(),"u_0");
 
         let proof = Proof::from_assumption(u);
 
@@ -225,8 +225,9 @@ mod tests {
 
     #[test]
     fn imp_intro_builds_implication_formula() {
-        let u = ProofAssumption::new(0, Formula::verum());
-        let body = Proof::from_assumption(ProofAssumption::new(1, Formula::falsum()));
+        let u = ProofAssumption::with_name(0, Formula::verum(),"u_0");
+        let body = Proof::from_assumption(
+            ProofAssumption::with_name(1, Formula::falsum(),"u_1"));
 
         let proof = Proof::imp_intro(u, body);
 
@@ -476,7 +477,6 @@ mod tests {
         let sigma: TypeSubstitution = HashMap::from([
             (0, Types::Nat),
             (1, Types::Nat),]);
-        println!("{:?}", sigma);
         let proof_subst_types = proof.subst_type(&sigma);
         println!("{}",proof_subst_types);
 
