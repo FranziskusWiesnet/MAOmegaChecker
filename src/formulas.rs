@@ -26,7 +26,6 @@ impl fmt::Display for Formula {
         }
     }
 }
-
 impl Formula {
     pub fn atom(t: &Term) -> Result<Self, TypeError> {
         if *t.ty() != Types::Boolean {

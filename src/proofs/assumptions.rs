@@ -8,10 +8,14 @@ use crate::types::{TypeError, TypeSubstitution};
 pub struct ProofAssumption {
     id: usize,
     form: Formula,
+    name: Option<String>,
 }
 impl fmt::Display for ProofAssumption {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "u_{}", self.id)
+        match &self.name {
+            Some(name) => write!(f, "{}", name),
+            None => write!(f, "Assumption(formula:{}; id:{})",self.form,self.id),
+        }
     }
 }
 impl ProofAssumption {
@@ -25,6 +29,7 @@ impl ProofAssumption {
         Self {
             id: self.id,
             form: self.form.clone().subst_type(sigma),
+            name: self.name.clone(),
         }
     }
 
@@ -32,11 +37,15 @@ impl ProofAssumption {
         Ok(Self {
             id: self.id,
             form: self.form.clone().subst(sigma)?,
+            name: self.name.clone(),
         })
     }
     pub fn new(id: usize, form: Formula) -> Self {
-        Self {id, form}
+        Self {id, form, name: None}
     }
+    pub fn with_name(id: usize, form: Formula, name: &str) -> Self { {
+        Self {id, form, name: Some(name.to_string())}
+    }}
 }
 pub fn new_assumption(formula: &Formula, h: HashSet<ProofAssumption>) -> ProofAssumption {
     let set_id: HashSet<usize> = h
@@ -74,9 +83,11 @@ pub fn assumption_map_for_term_subst (used_assumption: &HashSet<ProofAssumption>
     let mut rho: HashMap<ProofAssumption, ProofAssumption> = HashMap::new();
     for u in used_assumption {
         let new_form = u.form.subst(sigma)?;
-        let fresh_assumption = new_assumption(&new_form, forbidden.clone());
-        forbidden.insert(fresh_assumption.clone());
-        rho.insert(u.clone(), fresh_assumption);
+        if u.form != new_form {
+            let fresh_assumption = new_assumption(&new_form, forbidden.clone());
+            forbidden.insert(fresh_assumption.clone());
+            rho.insert(u.clone(), fresh_assumption);
+        }
     }
     Ok(rho)
     }

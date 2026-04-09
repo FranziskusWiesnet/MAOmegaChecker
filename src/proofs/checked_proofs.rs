@@ -1,13 +1,13 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use crate::formulas::Formula;
-use crate::proofs::assumptions::assumption_map_for_type_subst;
+use crate::proofs::assumptions::{assumption_map_for_type_subst};
 use crate::proofs::axioms::Axiom;
 use crate::proofs::proof_kind::{ProofError, ProofKind};
 use crate::proofs::ProofAssumption;
 use crate::terms::{new_var, ObjVar, Term, TermSubstitution};
 use crate::terms::obj_var::substitution_map;
-use crate::types::{TypeSubstitution, Types};
+use crate::types::{TypeError, TypeSubstitution, Types};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Proof {
     formula: Formula,
@@ -101,8 +101,11 @@ impl Proof {
                 Self::all_elim(Self::from_kind(m.as_ref().clone())?,t)
         }
     }
-    pub fn free_assumptions(self) -> HashSet<ProofAssumption> {
+    pub fn free_assumptions(&self) -> HashSet<ProofAssumption> {
         self.kind.free_assumptions()
+    }
+    pub fn used_assumptions(&self) -> HashSet<ProofAssumption> {
+        self.kind.used_assumptions()
     }
     pub fn free_type_vars(&self) -> HashSet<usize> {
         self.kind.free_type_vars()
@@ -118,6 +121,12 @@ impl Proof {
             formula: self.formula.subst_type_with_map(sigma,&used_var_subst),
             kind: self.kind.subst_type_with_maps(sigma, &used_var_subst, &used_assumption_map)
         }
+    }
+    pub fn subst(&self, sigma: &TermSubstitution) -> Result<Self,TypeError> {
+        Ok(Self{
+            kind: self.kind.subst(sigma)?,
+            formula: self.formula.subst(sigma)?,
+        })
     }
     pub fn free_vars(&self) -> HashSet<ObjVar> {
         self.kind.free_vars()
@@ -194,7 +203,7 @@ mod tests {
     use crate::proofs::axioms::Axiom;
     use crate::proofs::ProofAssumption;
     use crate::terms::{Const, ObjVar, Term};
-    use crate::types::Types;
+    use crate::types::{Types, TypeSubstitution};
 
     #[test]
     fn from_assumption_builds_proof_with_same_formula() {
@@ -403,11 +412,11 @@ mod tests {
         );
 
         let proof_base = Proof::from_assumption(
-            ProofAssumption::new(0, p_nil.clone()),
+            ProofAssumption::with_name(0, p_nil.clone(), "u_0"),
         );
 
         let proof_step = Proof::from_assumption(
-            ProofAssumption::new(1, step_formula.clone()),
+            ProofAssumption::with_name(1, step_formula.clone(), "u_1"),
         );
 
         let proof = Proof::induction(
@@ -417,6 +426,130 @@ mod tests {
             proof_step,
         ).unwrap();
         assert_eq!(proof.to_string(),"(((𝓘𝓷𝓭(xs.(P xs)) xs) u_0) u_1)")
+    }
+    #[test]
+    fn proof_in_propositional_logic_with_subst(){
+        let alpha = Types::TypeVar(0);
+        let beta = Types::TypeVar(1);
+        let gamma = Types::TypeVar(2);
+
+        let a = ObjVar::with_name(0,  alpha.clone(),"a");
+        let b = ObjVar::with_name(0, beta.clone(),"b");
+        let c = ObjVar::with_name(0, gamma.clone(),"c");
+
+        let bool_var = ObjVar::with_name(0, Types::Boolean,"bool");
+
+        let f = ObjVar::with_name(0, Types::arr(alpha.clone(), Types::Boolean),"f");
+        let g = ObjVar::with_name(0, Types::arr(beta.clone(), Types::Boolean),"g");
+        let h = ObjVar::with_name(0, Types::arr(gamma.clone(), Types::Boolean),"h");
+
+        let fa = Term::app(&Term::var(&f),&Term::var(&a)).unwrap();
+        let gb = Term::app(&Term::var(&g),&Term::var(&b)).unwrap();
+        let hc = Term::app(&Term::var(&h),&Term::var(&c)).unwrap();
+
+        let fa_form = Formula::atom(&fa).unwrap();
+        let gb_form = Formula::atom(&gb).unwrap();
+        let hc_form = Formula::atom(&hc).unwrap();
+        let bool_form = Formula::atom(&Term::var(&bool_var)).unwrap();
+
+        let fa_to_gb = Formula::imp(fa_form.clone(), gb_form.clone());
+        //let fa_to_gb_to_hc =
+        //    Formula::imp(fa_form.clone(), Formula::imp(gb_form.clone(), hc_form.clone()));
+        let fa_to_gb_to_bool =
+            Formula::imp(fa_form.clone(), Formula::imp(gb_form.clone(), bool_form.clone()));
+
+        let u0 = ProofAssumption::with_name(0, fa_to_gb_to_bool,"u");
+        let u1 = ProofAssumption::with_name(1, fa_to_gb, "v");
+        let u2 = ProofAssumption::with_name(2, fa_form, "w");
+
+        let proof_gb =
+            Proof::imp_elim(Proof::from_assumption(u1.clone()),Proof::from_assumption(u2.clone())).unwrap();
+        let proof_gb_to_hc =
+            Proof::imp_elim(Proof::from_assumption(u0.clone()),Proof::from_assumption(u2.clone())).unwrap();
+        let proof_hc = Proof::imp_elim(proof_gb_to_hc,proof_gb).unwrap();
+
+        let proof =   Proof::imp_intro(u0.clone(),Proof::imp_intro(u1.clone(),Proof::imp_intro(u2.clone(),proof_hc)));
+        assert_eq!(proof.free_assumptions(), HashSet::new());
+        assert_eq!(proof.used_assumptions(), HashSet::from_iter(vec![u0, u1, u2]));
+        assert_eq!(proof.to_string(), "(λ u. (λ v. (λ w. ((u w) (v w)))))");
+
+        let sigma: TypeSubstitution = HashMap::from([
+            (0, Types::Nat),
+            (1, Types::Nat),]);
+        println!("{:?}", sigma);
+        let proof_subst_types = proof.subst_type(&sigma);
+        println!("{}",proof_subst_types);
+
+        let rho: TermSubstitution = HashMap::from([
+            (bool_var.clone(), hc.clone()),
+        ]);
+        let proof_subst = proof.subst(&rho).unwrap();
+        println!("{}",proof);
+        print!("{}",proof_subst);
+
+    }
+    #[test]
+    fn proof_in_predicate_logic_with_subst(){
+        let alpha = Types::TypeVar(0);
+
+        let x = ObjVar::with_name(0,  alpha.clone(),"x");
+
+        let p = ObjVar::with_name(0, Types::arr(alpha.clone(), Types::Boolean),"P");
+        let q = ObjVar::with_name(1, Types::arr(alpha.clone(), Types::Boolean),"Q");
+
+        let px = Term::app(&Term::var(&p),&Term::var(&x)).unwrap();
+        let qx = Term::app(&Term::var(&q),&Term::var(&x)).unwrap();
+
+        let px_form = Formula::atom(&px).unwrap();
+        let qx_form = Formula::atom(&qx).unwrap();
+
+        let all_px = Formula::forall(x.clone(), px_form.clone());
+        let px_to_qx =
+            Formula::forall(x.clone(), Formula::imp(px_form.clone(), qx_form.clone()));
+
+        let u0 = ProofAssumption::with_name(0, px_to_qx.clone(),"u0");
+        let u1 = ProofAssumption::with_name(0, all_px.clone(),"u1");
+
+        let proof =
+            Proof::imp_intro(u0.clone(),
+                             Proof::imp_intro(u1.clone(),
+                                              Proof::all_intro(x.clone(),
+                                                               Proof::imp_elim(
+                                                                   Proof::all_elim(
+                                                                       Proof::from_assumption(
+                                                                           u0.clone()),
+                                                                       Term::var(&x)).unwrap(),
+                                                                   Proof::all_elim(
+                                                                       Proof::from_assumption(
+                                                                           u1.clone()),
+                                                                       Term::var(&x)).unwrap())
+                                                                   .unwrap()).unwrap()));
+        assert_eq!(proof.to_string(), "(λ u0. (λ u1. (λ x. ((u0 x) (u1 x)))))");
+        assert_eq!(proof.formula.to_string(),
+            "((∀ x. ((P x) -> (Q x))) -> ((∀ x. (P x)) -> (∀ x. (Q x))))");
+        assert_eq!(proof.free_assumptions(), HashSet::new());
+        assert_eq!(proof.used_assumptions(), HashSet::from_iter(vec![u0, u1]));
+
+        let sigma: TypeSubstitution = HashMap::from([
+            (0, Types::Nat),
+            (1, Types::Nat)]);
+        let proof_subst_types = proof.subst_type(&sigma);
+        let p_subst: ObjVar = ObjVar::new(0, Types::arr(Types::Nat, Types::Boolean));
+        let q_subst: ObjVar = ObjVar::new(1, Types::arr(Types::Nat, Types::Boolean));
+        assert_eq!(proof_subst_types.formula.free_vars(), HashSet::from_iter([p_subst, q_subst]));
+        let id: TermSubstitution = HashMap::from([
+            (q.clone(), Term::var(&q)),
+        ]);
+        let proof_subst_id = proof.subst(&id).unwrap();
+        assert_eq!(proof_subst_id, proof);
+        let rho: TermSubstitution = HashMap::from([
+            (q.clone(), Term::var(&p)),
+            (p.clone(), Term::var(&q)),
+        ]);
+        let proof_subst = proof.subst(&rho).unwrap();
+        assert_ne!(proof_subst, proof);
+        assert_eq!(proof_subst.subst(&rho).unwrap(), proof);
+
     }
     #[test]
     fn efq_of_atom(){
