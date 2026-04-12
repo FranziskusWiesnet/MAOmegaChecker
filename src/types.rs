@@ -90,19 +90,19 @@ impl fmt::Display for TypeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TypeError::Mismatch { expected, found } => {
-                write!(f, "type mismatch: expected {}, found {}", expected, found)
+                write!(f, "TypeError: mismatch expected {}, found {}", expected, found)
             }
             TypeError::ExpectedFunction(ty) => {
-                write!(f, "expected function type, found {}", ty)
+                write!(f, "TypeError: expected function type, found {}", ty)
             }
             TypeError::ExpectedBoolean(ty) => {
-                write!(f, "expected boolean type, found {}", ty)
+                write!(f, "TypeError: expected boolean type, found {}", ty)
             }
             TypeError::ExpectedList(ty) => {
-                write!(f, "expected list type, found {}", ty)
+                write!(f, "TypeError: expected list type, found {}", ty)
             }
             TypeError::ExpectedInd(ty) => {
-                write!(f, "expected inductive type, found {}", ty)
+                write!(f, "TypeError: expected inductive type, found {}", ty)
             }
         }
     }
