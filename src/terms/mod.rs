@@ -2,6 +2,7 @@ pub mod obj_var;
 pub mod consts;
 pub mod term_kinds;
 pub mod typed_terms;
+mod normal_form;
 
 pub use obj_var::ObjVar;
 pub use obj_var::new_var;
