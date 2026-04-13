@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use crate::terms::{TermKind, TermKindSubstitution};
+use crate::terms::{new_var, Term, TermKind, TermKindSubstitution};
+use crate::types::{TypeError, Types};
 
 impl TermKind {
     fn beta_normalize(&self) -> Self {
@@ -11,7 +12,6 @@ impl TermKind {
                     TermKind::Abs(u,body) => {
                         let sigma: TermKindSubstitution = HashMap::from([(u,s_red)]);
                         body.subst(&sigma).beta_normalize()
-
                     }
                     _ => TermKind::app(t_red,s_red)
                 }
@@ -24,7 +24,39 @@ impl TermKind {
 
         }
     }
+    fn eta_expand(&self) -> Result<Self,TypeError> {
+        let term = Term::from_kind(self)?;
+        match term.ty() {
+            Types::Arr(a,b) => {
+                match self{
+                    TermKind::Abs(u,s) => {
+                        Ok(TermKind::Abs(u.clone(),Box::new(s.eta_expand()?)))
+                    }
+                    _ => {
+                        let used_vars = self.used_var_names();
+                        let fresh_var = new_var(a.as_ref(),used_vars);
+                        let app = TermKind::app(self.clone(), TermKind::Var(fresh_var.clone()));
+                        let body = app.eta_expand()?;
+                        Ok(TermKind::Abs(fresh_var, Box::new(body)))
+                    }
+                }
+            }
+            _ => {
+                match self {
+                    TermKind::App(t, s) => {
+                        Ok(TermKind::app(t.as_ref().clone(), s.eta_expand()?))
+                    }
+                    TermKind::Abs(u, body) => {
+                        Ok(TermKind::Abs(u.clone(), Box::new(body.eta_expand()?)))
+                    }
+                    _ => Ok(self.clone()),
+                }
+            }
+        }
+    }
 }
+
+
 
 
 
@@ -105,5 +137,24 @@ mod tests {
 
         let fail = Term::from_kind(&omega).unwrap_err();
         println!("{}",fail)
+    }
+    #[test]
+    fn simple_test_for_eta_expansion(){
+        let f = ObjVar::with_name(
+            0,
+            Types::arr(Types::Nat,Types::arr(Types::Nat, Types::Nat)),
+            "f");
+        let f_term = TermKind::Var(f);
+        println!("{}",f_term.eta_expand().unwrap());
+    }
+    #[test]
+    fn simple_test_for_eta_expansion_with_application(){
+        let f = ObjVar::with_name(
+            0,
+            Types::arr(Types::Nat,Types::arr(Types::Nat, Types::Nat)),
+            "f");
+        let x = ObjVar::with_name(2, Types::Nat,"x");
+        let f_term = TermKind::app(TermKind::Var(f),TermKind::Var(x));
+        println!("{}",f_term.eta_expand().unwrap());
     }
 }

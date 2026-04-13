@@ -18,6 +18,7 @@ pub enum TermKind {
     Abs(ObjVar, Box<TermKind>),
 }
 
+
 impl fmt::Display for TermKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
