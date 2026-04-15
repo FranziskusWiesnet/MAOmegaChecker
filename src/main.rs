@@ -9,7 +9,7 @@ use crate::types::Types;
 use crate::terms::obj_var::ObjVar;
 use crate::terms::Term;
 use crate::terms::Const;
-use crate::formulas::{Formula, is_qfree};
+use crate::formulas::{Formula, is_qfree, Stab};
 use crate::types::Types::TypeVar;
 
 
@@ -17,6 +17,7 @@ fn setPrint(formula: &Formula) -> bool {
     println!("{}", formula);
     true
 }
+
 fn setD(formula: &Formula) -> bool {
     match formula {
         Formula::Bottom => true,
@@ -55,6 +56,64 @@ fn setI(formula: &Formula) -> bool {
     }
 }
 
+fn isStab(formula: &Formula) -> Option<Formula> {
+    let F = Formula::Atom(Term::ff());
+    match formula {
+        Formula::Imp(A,B) =>
+        match A.as_ref() {
+            Formula::Imp(A_1,A_2) =>
+                {
+                    if *A_2.as_ref() != F {
+                        None
+                    } else{
+                        match A_1.as_ref(){
+                            Formula::Imp(A_11,A_12) => {
+                                if *A_12.as_ref() != F || A_11 != B {
+                                    None
+                                } else {
+                                    Some(B.as_ref().clone())
+                                }
+                            }
+                            _ => None,
+                        }
+                    }
+                }
+            _ => None,
+        }
+        _=> None
+    }
+}
+
+fn isNegBot(formula: &Formula) -> Option<Formula> {
+    let B = Formula::Bottom;
+    match formula {
+        Formula::Imp(a, b) => {
+            if *b.as_ref() != B {
+                None
+            } else {
+                match a.as_ref() {
+                    Formula::Imp(a1,a2) =>
+                        {
+                            if *b.as_ref() != B {
+                                None
+                            } else {
+                                Some(a1.as_ref().clone())
+                            }
+                        }
+                    _ => {None}
+                }
+            }
+        }
+        _ => None,
+    }
+}
+fn isUniversalStab(formula: &Formula) -> Option<Formula> {
+    match formula {
+        Formula::Forall(x, A) => isUniversalStab(A.as_ref()),
+        _ => isStab(formula)
+    }
+}
+
 fn imp(a: &Formula, b: &Formula) -> Formula {
     Formula::Imp(Box::new(a.clone()), Box::new(b.clone()))
 }
@@ -71,6 +130,7 @@ fn main() {
     let x = ObjVar::with_name(0, xi, "x");
     let qx = Term::app(&Term::var(&q), &Term::var(&x)).unwrap();
     let qx_form = Formula::Atom(qx.clone());
+    let Stab = Stab(&qx_form);
     let S = all(&x, &imp(&imp(&imp(&qx_form, &F), &F), &qx_form));
     let AllQx = all(&x, &qx_form);
     let T = imp(&imp(&AllQx, &bot), &bot);
@@ -82,5 +142,6 @@ fn main() {
     println!("{B}");
     println!("{}", setG(&B));
     println!("{}", setD(&B));
-
+    println!("{}", isStab(&S.kernel()).unwrap());
+    println!("{}", isNegBot(&T).unwrap().kernel());
 }

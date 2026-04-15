@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use crate::imp;
 use crate::terms::{Const, ObjVar, Term, free_vars_of_substitution,
                    TermSubstitution, TermKindSubstitution, new_var};
 use crate::types::{TypeError, Types, TypeSubstitution};
@@ -12,6 +13,8 @@ pub enum Formula {
     Forall(ObjVar, Box<Formula>),
     Bottom,
 }
+
+
 impl fmt::Display for Formula {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -249,6 +252,17 @@ impl Formula {
     }
 }
 
+impl Formula {
+    pub(crate) fn kernel(&self) -> Formula {
+        match self {
+            Formula::Forall(_,body) => {
+                body.kernel()
+            }
+            _=> self.clone(),
+
+        }
+    }
+}
 
 
 pub fn is_qfree(formula: &Formula) -> bool {
@@ -258,6 +272,11 @@ pub fn is_qfree(formula: &Formula) -> bool {
         Formula::Forall(_, _) => false,
         Formula::Imp(g, h) => is_qfree(&g) && is_qfree(&h),
     }
+}
+
+pub fn Stab(formula: &Formula) -> Formula {
+    let F = Formula::Atom(Term::ff());
+    imp(&imp(&imp(formula,&F),&F),formula)
 }
 
 #[cfg(test)]
