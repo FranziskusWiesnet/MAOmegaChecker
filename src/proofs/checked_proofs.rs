@@ -9,7 +9,7 @@ use crate::terms::{new_var, ObjVar, Term, TermSubstitution};
 use crate::terms::obj_var::substitution_map;
 use crate::types::{TypeError, TypeSubstitution, Types};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct Proof {
+pub struct Proof {
     formula: Formula,
     kind: ProofKind,
 }
@@ -19,6 +19,9 @@ impl fmt::Display for Proof {
     }
 }
 impl Proof {
+    pub fn formula(&self) -> &Formula {
+        &self.formula
+    }
     pub fn from_assumption(assumption: ProofAssumption) -> Self {
         Self {
             formula: assumption.clone().form(),
@@ -450,7 +453,7 @@ mod tests {
 
         let fa_form = Formula::atom(&fa).unwrap();
         let gb_form = Formula::atom(&gb).unwrap();
-        let hc_form = Formula::atom(&hc).unwrap();
+        // let hc_form = Formula::atom(&hc).unwrap();
         let bool_form = Formula::atom(&Term::var(&bool_var)).unwrap();
 
         let fa_to_gb = Formula::imp(fa_form.clone(), gb_form.clone());

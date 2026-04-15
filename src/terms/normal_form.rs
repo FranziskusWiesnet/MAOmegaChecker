@@ -27,7 +27,7 @@ impl TermKind {
     fn eta_expand(&self) -> Result<Self,TypeError> {
         let term = Term::from_kind(self)?;
         match term.ty() {
-            Types::Arr(a,b) => {
+            Types::Arr(a,_b) => {
                 match self{
                     TermKind::Abs(u,s) => {
                         Ok(TermKind::Abs(u.clone(),Box::new(s.eta_expand()?)))
@@ -55,9 +55,6 @@ impl TermKind {
         }
     }
 }
-
-
-
 
 
 #[cfg(test)]
@@ -102,7 +99,7 @@ mod tests {
     }
     #[test]
     fn test_long_term_for_beta_red(){
-        let f = ObjVar::with_name(0, Types::arr(Types::Nat, Types::Nat), "f");
+        let _f = ObjVar::with_name(0, Types::arr(Types::Nat, Types::Nat), "f");
         let g = ObjVar::with_name(1, Types::arr(Types::Nat, Types::Nat), "g");
         let x = ObjVar::with_name(0, Types::Nat, "x");
         let y = ObjVar::with_name(1, Types::Nat, "y");

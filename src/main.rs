@@ -4,6 +4,7 @@ mod types;
 mod formulas;
 mod terms;
 mod proofs;
+mod form_clas;
 
 use crate::types::Types;
 use crate::terms::obj_var::ObjVar;
@@ -17,6 +18,7 @@ fn setPrint(formula: &Formula) -> bool {
     println!("{}", formula);
     true
 }
+
 
 fn setD(formula: &Formula) -> bool {
     match formula {
@@ -41,7 +43,7 @@ fn setG(formula: &Formula) -> bool {
 }
 fn setR(formula: &Formula) -> bool {
     match formula {
-        Formula::Bottom => false,
+        Formula::Bottom => true,
         Formula::Atom(_) => true,
         Formula::Forall(_, A) => setR(A),
         Formula::Imp(A, B) => setG(A) && setR(B),
@@ -92,7 +94,7 @@ fn isNegBot(formula: &Formula) -> Option<Formula> {
                 None
             } else {
                 match a.as_ref() {
-                    Formula::Imp(a1,a2) =>
+                    Formula::Imp(a1,_) =>
                         {
                             if *b.as_ref() != B {
                                 None
@@ -100,7 +102,7 @@ fn isNegBot(formula: &Formula) -> Option<Formula> {
                                 Some(a1.as_ref().clone())
                             }
                         }
-                    _ => {None}
+                    _ => None,
                 }
             }
         }
