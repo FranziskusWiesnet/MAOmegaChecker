@@ -874,9 +874,9 @@ mod tests {
     }
     #[test]
     fn case_dist_for_implications() {
-        let a = ObjVar::with_name(1, Types::Boolean, "A");
-        let b = ObjVar::with_name(2, Types::Boolean, "B");
-        let x = ObjVar::with_name(1, Types::Boolean,"X");
+        let a = ObjVar::with_name(0, Types::Boolean, "A");
+        let b = ObjVar::with_name(1, Types::Boolean, "B");
+        let x = ObjVar::with_name(2, Types::Boolean,"X");
         let a_form = Formula::Atom(Term::var(&a));
         let b_form = Formula::Atom(Term::var(&b));
         let x_form = Formula::Atom(Term::var(&x));

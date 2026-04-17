@@ -6,6 +6,7 @@ mod terms;
 mod proofs;
 mod form_clas;
 
+use crate::form_clas::d_proof;
 use crate::types::Types;
 use crate::terms::obj_var::ObjVar;
 use crate::terms::Term;
@@ -139,11 +140,12 @@ fn main() {
     let StoT = imp(&S, &T);
 
     println!("{StoT}");
-    println!("{}", setD(&StoT));
+    println!("{:?}", d_proof(&StoT));
     let B = imp(&imp(&qx_form, &bot), &bot);
     println!("{B}");
     println!("{}", setG(&B));
-    println!("{}", setD(&B));
+    println!("{}", setD(&StoT));
+    println!("{}",d_proof(&B).unwrap().formula());
     println!("{}", isStab(&S.kernel()).unwrap());
     println!("{}", isNegBot(&T).unwrap().kernel());
 }
