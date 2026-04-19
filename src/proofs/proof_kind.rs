@@ -5,6 +5,7 @@ use crate::formulas::Formula;
 use crate::terms::{new_var, ObjVar, Term, TermSubstitution};
 use crate::proofs::axioms::{Axiom};
 use crate::proofs::assumptions::{assumption_map_for_term_subst, assumption_map_for_type_subst, new_assumption, ProofAssumption};
+use crate::proofs::checked_proofs::Proof;
 use crate::proofs::proof_kind::ProofKind::AllElim;
 use crate::terms::obj_var::substitution_map;
 use crate::terms::typed_terms::free_vars_of_term_substitution;
@@ -197,7 +198,7 @@ pub fn subst_assumption(&self, sigma: &ProofKindSubstitution) -> Self {
                     let mut forbidden = m.free_assumptions();
                     forbidden.remove(u);
                     forbidden.extend(set_free_assumptions);
-                    let fresh_assumption = new_assumption(&u.form(), forbidden);
+                    let fresh_assumption = new_assumption(&u.form(), &forbidden);
                     sigma_wo_assumption
                         .insert(u.clone(), ProofKind::Assumption(fresh_assumption.clone()));
                     ProofKind::ImpIntro(fresh_assumption,
@@ -430,6 +431,47 @@ pub fn subst_assumption(&self, sigma: &ProofKindSubstitution) -> Self {
             assumption_map_for_term_subst(&used_assumptions, &sigma)?;
         self.subst_with_map(sigma, &used_assumption_map)
     }
+    pub fn subst_bot_with_map(&self,
+                              formula: &Formula,
+                              assumption_map: &HashSet<ProofAssumption>)
+                              -> Result<ProofKind, ProofError> {
+        match self {
+            ProofKind::Assumption(u) => {
+                match assumption_map.get(u) {
+                    None => Ok(self.clone()),
+                    Some(v) => Ok(ProofKind::Assumption(v.clone())),
+                }
+            }
+            ProofKind::Ax(axiom) => {
+                match axiom {
+                    Axiom::AxTrue => Ok(self.clone()),
+                    Axiom::BotIntro => Ok(Proof::efq(formula).kind().clone()),
+                    Axiom::Case(b, a) => todo!(),
+                    Axiom::Ind(x, a) => todo!(),
+                }
+            }
+            ProofKind::ImpIntro(u, m) => {
+                match assumption_map.get(u) {
+                    None => Ok(ProofKind::ImpIntro(u.clone(),
+                        Box::new(m.as_ref().subst_bot_with_map(formula,assumption_map)?))),
+                    Some(v) => {
+                        let sigma: ProofKindSubstitution  =
+                            HashMap::from([(u.clone(), ProofKind::Assumption(v.clone()))]);
+                        let m_subst = m.as_ref().subst_assumption(&sigma);
+                        let m_new = m_subst.subst_bot_with_map(formula,assumption_map)?;
+                        Ok(ProofKind::ImpIntro(v.clone(),Box::new(m_new)))
+                    }
+                }
+            }
+            ProofKind::ImpElim(m, n) => {
+                let m_subst = m.as_ref().subst_bot_with_map(formula, assumption_map)?;
+                let n_subst = n.as_ref().subst_bot_with_map(formula, assumption_map)?;
+                Ok(ProofKind::ImpElim(Box::new(m_subst), Box::new(n_subst)))
+            }
+            ProofKind::AllIntro(_, _) => { todo!() }
+            ProofKind::AllElim(_, _) => { todo!() }
+        }
+    }
 }
 impl PartialEq for ProofKind {
     fn eq(&self, other: &Self) -> bool {
@@ -450,7 +492,7 @@ impl PartialEq for ProofKind {
                 }
                 let mut set = m1.free_assumptions();
                 set.extend(m2.free_assumptions());
-                let fresh_assumption = new_assumption(&u1.form(), set);
+                let fresh_assumption = new_assumption(&u1.form(), &set);
                 let sigma_1: ProofKindSubstitution = HashMap::from(
                     [(u1.clone(),ProofKind::Assumption(fresh_assumption.clone()))]);
                 let sigma_2: ProofKindSubstitution = HashMap::from(

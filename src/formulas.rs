@@ -49,8 +49,31 @@ impl Formula {
         match self {
             Formula::Bottom => Formula::falsum(),
             Formula::Atom(_) => self.clone(),
-            Formula::Imp(a, b) => Formula::Imp(Box::new(a.F()), Box::new(b.F())),
-            Formula::Forall(x, a) => Formula::Forall(x.clone(), Box::new(a.F())),
+            Formula::Imp(a, b) =>
+                Formula::Imp(Box::new(a.F()), Box::new(b.F())),
+            Formula::Forall(x, a) =>
+                Formula::Forall(x.clone(), Box::new(a.F())),
+        }
+    }
+    pub fn subst_bot(&self, formula: &Formula) -> Self {
+        match self {
+            Formula::Bottom => formula.clone(),
+            Formula::Atom(_) => self.clone(),
+            Formula::Imp(a, b) =>
+                Formula::Imp(Box::new(a.subst_bot(formula)), Box::new(b.subst_bot(formula))),
+            Formula::Forall(x, a) => {
+                let mut free_vars = formula.free_vars();
+                if free_vars.contains(&x) {
+                    free_vars.extend(a.free_vars());
+                    let fresh_var = new_var(x.ty(), free_vars);
+                    let fresh_var_term = Term::var(&fresh_var);
+                    let sigma : TermSubstitution = HashMap::from([(x.clone(),fresh_var_term)]);
+                    let a_subst = a.subst(&sigma).unwrap();
+                    Formula::Forall(fresh_var, Box::new(a_subst.subst_bot(formula)))
+                } else {
+                    Formula::Forall(x.clone(), Box::new(a.subst_bot(formula)))
+                }
+            }
         }
     }
     pub fn free_type_vars(&self) -> HashSet<usize> {
@@ -422,5 +445,26 @@ mod tests {
             }
             _ => panic!("Expected a universally quantified formula"),
         }
+    }
+    #[test]
+    fn subst_bot_example() {
+        let a = ObjVar::with_name(0, Types::Boolean, "A");
+        let b = ObjVar::with_name(1, Types::Boolean, "B");
+        
+        let a_term = Term::var(&a);
+        let b_term = Term::var(&b);
+        
+        let formula =
+            Formula::forall(a,
+                Formula::imp(
+                    Formula::Bottom,
+                    Formula::imp(
+                        Formula::Atom(a_term.clone()),
+                        Formula::Atom(b_term.clone()))));
+        
+        let subst_formula =  Formula::forall(b,   Formula::imp(
+            Formula::Atom(a_term.clone()),
+            Formula::Atom(b_term)));
+        println!("{}", formula.subst_bot(&subst_formula));
     }
 }

@@ -47,7 +47,7 @@ impl ProofAssumption {
         Self {id, form, name: Some(name.to_string())}
     }}
 }
-pub fn new_assumption(formula: &Formula, h: HashSet<ProofAssumption>) -> ProofAssumption {
+pub fn new_assumption(formula: &Formula, h: &HashSet<ProofAssumption>) -> ProofAssumption {
     let set_id: HashSet<usize> = h
         .iter()
         .cloned()
@@ -69,25 +69,41 @@ pub fn assumption_map_for_type_subst (used_assumption: &HashSet<ProofAssumption>
     for u in used_assumption {
         let new_form = u.form.subst_type_with_map(sigma, var_subst);
         if new_form != u.form {
-            let fresh_assumption = new_assumption(&new_form, forbidden.clone());
+            let fresh_assumption = new_assumption(&new_form, &forbidden);
             forbidden.insert(fresh_assumption.clone());
             rho.insert(u.clone(), fresh_assumption);
         }
     }
     rho
 }
-pub fn assumption_map_for_term_subst (used_assumption: &HashSet<ProofAssumption>,
-                                      sigma: &TermSubstitution)
-    -> Result<HashMap<ProofAssumption,ProofAssumption>, TypeError> {
+pub fn assumption_map_for_term_subst(used_assumption: &HashSet<ProofAssumption>,
+                                     sigma: &TermSubstitution)
+                                     -> Result<HashMap<ProofAssumption, ProofAssumption>, TypeError> {
     let mut forbidden = used_assumption.clone();
     let mut rho: HashMap<ProofAssumption, ProofAssumption> = HashMap::new();
     for u in used_assumption {
         let new_form = u.form.subst(sigma)?;
         if u.form != new_form {
-            let fresh_assumption = new_assumption(&new_form, forbidden.clone());
+            let fresh_assumption = new_assumption(&new_form, &forbidden);
             forbidden.insert(fresh_assumption.clone());
             rho.insert(u.clone(), fresh_assumption);
         }
     }
     Ok(rho)
+}
+
+pub fn assumption_map_for_bot_subst(used_assumption: &HashSet<ProofAssumption>,
+                                    formula: &Formula)
+                                    -> HashMap<ProofAssumption, ProofAssumption> {
+    let mut forbidden = used_assumption.clone();
+    let mut rho: HashMap<ProofAssumption, ProofAssumption> = HashMap::new();
+    for u in used_assumption {
+        let new_form = u.form.subst_bot(formula);
+        if u.form != new_form {
+            let fresh_assumption = new_assumption(&new_form, &forbidden);
+            forbidden.insert(fresh_assumption.clone());
+            rho.insert(u.clone(), fresh_assumption);
+        }
     }
+    rho
+}

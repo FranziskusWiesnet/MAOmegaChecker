@@ -84,8 +84,7 @@ fn i_prop_to_g_prop(formula: &Formula) -> Option<Proof> {
     // v : A^F → ⊥
     let i_prop = ProofAssumption::new(
         0,
-        imp(formula, &formula.F()),
-    );
+        imp(formula, &formula.F()));
     // i_prop : A → A^F
     Some(
         imp_intro( // (A → A^F) → A → (A^F → ⊥) → ⊥

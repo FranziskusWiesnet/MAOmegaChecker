@@ -19,6 +19,10 @@ impl fmt::Display for Proof {
     }
 }
 impl Proof {
+    
+    pub fn kind(&self) -> &ProofKind {
+        &self.kind
+    }
     pub fn formula(&self) -> &Formula {
         &self.formula
     }
