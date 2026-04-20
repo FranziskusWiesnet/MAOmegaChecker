@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 use crate::formulas::Formula;
 use crate::terms::{new_var, ObjVar, Term, TermSubstitution};
 use crate::proofs::axioms::{Axiom};
-use crate::proofs::assumptions::{assumption_map_for_term_subst, assumption_map_for_type_subst, new_assumption, ProofAssumption};
+use crate::proofs::assumptions::{assumption_map_for_bot_subst, assumption_map_for_term_subst, assumption_map_for_type_subst, new_assumption, ProofAssumption};
 use crate::proofs::checked_proofs::Proof;
 use crate::proofs::proof_kind::ProofKind::AllElim;
 use crate::terms::obj_var::substitution_map;
@@ -368,6 +368,32 @@ pub fn subst_assumption(&self, sigma: &ProofKindSubstitution) -> Self {
             }
         }
     }
+    pub fn bounded_vars(&self) -> HashSet<ObjVar> {
+        match self {
+            ProofKind::Assumption(u) => u.form().bounded_vars(),
+            ProofKind::Ax(ax) => ax.bounded_vars(),
+            ProofKind::ImpIntro(u, m) => {
+            let mut set = u.form().bounded_vars();
+            set.extend(m.bounded_vars());
+                set
+            }
+            ProofKind::ImpElim(m, n) => {
+                let mut set = m.bounded_vars();
+                set.extend(n.bounded_vars());
+                set
+            }
+            ProofKind::AllIntro(var,m) => {
+                let mut set = m.bounded_vars();
+                set.insert(var.clone());
+                set
+            }
+            ProofKind::AllElim(forall_proof,t) => {
+                let mut set = forall_proof.bounded_vars();
+                set.extend(t.bounded_vars());
+                set
+            }
+        }
+    }
 
     pub fn subst_with_map (&self,
                            sigma: &TermSubstitution,
@@ -433,8 +459,9 @@ pub fn subst_assumption(&self, sigma: &ProofKindSubstitution) -> Self {
     }
     pub fn subst_bot_with_map(&self,
                               formula: &Formula,
-                              assumption_map: &HashSet<ProofAssumption>)
+                              assumption_map: &HashMap<ProofAssumption,ProofAssumption>)
                               -> Result<ProofKind, ProofError> {
+        // This substitution only works safely, if not free variable of formula is bounded in self.
         match self {
             ProofKind::Assumption(u) => {
                 match assumption_map.get(u) {
@@ -468,9 +495,41 @@ pub fn subst_assumption(&self, sigma: &ProofKindSubstitution) -> Self {
                 let n_subst = n.as_ref().subst_bot_with_map(formula, assumption_map)?;
                 Ok(ProofKind::ImpElim(Box::new(m_subst), Box::new(n_subst)))
             }
-            ProofKind::AllIntro(_, _) => { todo!() }
-            ProofKind::AllElim(_, _) => { todo!() }
+            ProofKind::AllIntro(x, m) => {
+                let proof_subst = m.subst_bot_with_map(formula, assumption_map)?;
+                Ok(ProofKind::AllIntro(x.clone(), Box::new(proof_subst)))
+            }
+            ProofKind::AllElim(m, t) => {
+                let proof_subst = m.subst_bot_with_map(formula, assumption_map)?;
+                Ok(ProofKind::AllElim(Box::new(proof_subst), t.clone()))
+            }
         }
+    }
+    pub fn subst_bot(&self, formula: &Formula) -> Self {
+        let bounded_vars = self.bounded_vars();
+        let free_vars = formula.free_vars();
+        let mut forbidden = bounded_vars.clone();
+        let mut sigma: HashMap<ObjVar,ObjVar> = HashMap::new();
+        for v in free_vars {
+            if forbidden.contains(&v) {
+             let u = new_var(v.ty(), forbidden.clone());
+                sigma.insert(v.clone(), u.clone());
+            } else {
+                forbidden.insert(v);
+            }
+        }
+        let sigma_forward =
+            sigma.iter().map(|(v,u)| (v.clone(),Term::var(u))).collect();
+        let sigma_back =
+            sigma.iter().map(|(v,u)| (u.clone(),Term::var(v))).collect();
+        let new_self = self.subst(&sigma_forward).unwrap();
+        let new_formula = formula.subst(&sigma_forward).unwrap();
+        let used_assumptions = new_self.used_assumptions();
+        let used_assumption_map =
+            assumption_map_for_bot_subst(&used_assumptions, &new_formula);
+        let new_self_subst =
+            new_self.subst_bot_with_map(&new_formula,&used_assumption_map).unwrap();
+        new_self_subst.subst(&sigma_back).unwrap()
     }
 }
 impl PartialEq for ProofKind {

@@ -19,7 +19,6 @@ impl fmt::Display for Proof {
     }
 }
 impl Proof {
-    
     pub fn kind(&self) -> &ProofKind {
         &self.kind
     }
@@ -135,10 +134,16 @@ impl Proof {
             formula: self.formula.subst(sigma)?,
         })
     }
+    pub fn subst_bot(&self, formula: &Formula) -> Self {
+        Self {
+            kind: self.kind.subst_bot(formula),
+            formula: self.formula.subst_bot(formula),
+        }
+    }
     pub fn free_vars(&self) -> HashSet<ObjVar> {
         self.kind.free_vars()
     }
-    
+    pub fn bounded_vars(&self) -> HashSet<ObjVar> {self.kind().bounded_vars()}
     pub fn cases(b: ObjVar, formula: Formula, proof_tt: Proof, proof_ff: Proof)
         -> Result<Self, ProofError> {
         let ax = Proof::from_axiom(Axiom::Case(b,formula))?;
@@ -589,5 +594,56 @@ mod tests {
         // println!("{}", proof);
         // (λ u_0. (λ n. ((λ u_0. (λ u_0. (((𝒞((𝔹)_0.(𝔹)_0) (Q n)) AxT) u_0))) u_0)))
         assert_eq!(proof.kind.formula().unwrap(),proof.formula);
+    }
+    #[test]
+    fn test_subst_bot(){
+        let a = ObjVar::with_name(0, Types::Boolean, "a");
+        let b = ObjVar::with_name(1, Types::Boolean, "b");
+        let c = ObjVar::with_name(2, Types::Boolean, "c");
+        
+        let a_term = Term::var(&a);
+        let b_term = Term::var(&b);
+        let c_term = Term::var(&c);
+        
+        let a_form = Formula::atom(&a_term).unwrap();
+        let b_form = Formula::atom(&b_term).unwrap();
+        let c_form = Formula::atom(&c_term).unwrap();
+        let bot = Formula::Bottom;
+        
+        let formula =
+            Formula::imp(a_form.clone(), Formula::imp(b_form.clone(),c_form.clone()));
+        // Formula = a → b → c
+        
+        let u =
+            ProofAssumption::new(0, Formula::imp(a_form.clone(),b_form.clone()));
+        // u : a → b
+        let v =
+            ProofAssumption::new(1, Formula::imp(b_form.clone(),Formula::falsum()));
+        // v :  b → F
+        let w = ProofAssumption::new(2, a_form.clone());
+        // w : a
+        
+        let proof =
+        Proof::all_intro( // ∀a. (a → b) → (b → F) → a → ⊥
+            a, // a
+            Proof::imp_intro( // (a → b) → (b → F) → a → ⊥
+                u.clone(), // a → b
+            Proof::imp_intro( // (b → F) → a → ⊥
+                v.clone(), // b → F
+        Proof::imp_intro( // a → ⊥
+            w.clone(), // a
+        Proof::imp_elim( // ⊥
+        Proof::from_axiom(Axiom::BotIntro).unwrap(),// F → ⊥
+            Proof::imp_elim( // F
+                Proof::from_assumption(v.clone()), // b → F
+                Proof::imp_elim( // b
+                    Proof::from_assumption(u.clone()), // a → b
+                    Proof::from_assumption(w.clone()) // a
+                ).unwrap()
+            ).unwrap()
+        ).unwrap())))).unwrap();
+        
+        println!("{}", proof.subst_bot(&formula).formula());
+        
     }
 }

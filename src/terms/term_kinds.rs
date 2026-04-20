@@ -72,6 +72,18 @@ impl TermKind {
             }
         }
     }
+    pub fn bounded_vars(&self) -> HashSet<ObjVar> {
+        match self {
+            TermKind::Var(_) => HashSet::new(),
+            TermKind::Const(_) => HashSet::new(),
+            TermKind::App(s, t) => {
+                let mut a = t.bounded_vars();
+                a.extend(s.bounded_vars());
+                a
+            }
+            TermKind::Abs(x, _) => HashSet::from([x.clone()]),
+        }
+    }
     pub fn used_var_names(&self) -> HashSet<ObjVar> {
         let mut set = HashSet::new();
         match self {

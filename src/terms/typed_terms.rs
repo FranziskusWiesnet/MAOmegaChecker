@@ -93,6 +93,7 @@ impl Term {
     pub fn free_var(&self) -> HashSet<ObjVar> {
         self.kind.free_vars()
     }
+    pub fn bounded_vars(&self) -> HashSet<ObjVar> {self.kind.bounded_vars()}
     pub fn used_var_names(&self) -> HashSet<ObjVar> {self.kind.used_var_names()}
 }
 
@@ -298,5 +299,21 @@ mod tests {
         assert_eq!(ty.ty(), &Types::arr(alpha.clone(), alpha.clone()));
 
         assert_eq!(tx, ty);
+    }
+    #[test]
+    fn substitution_inside_boundednes() {
+        let x = ObjVar::with_name(0, Types::Nat, "x");
+        let y = ObjVar::with_name(1, Types::Nat, "y");
+        let term =
+            Term::abs(&x,
+                &Term::app(
+                    &Term::app(
+                        &Term::constant(Const::Pair(Types::Nat, Types::Nat)),
+                        &Term::var(&x)).unwrap(),
+                    &Term::var(&y)).unwrap());
+        println!("{}", term);
+        let sigma: TermSubstitution = HashMap::from([(y.clone(), Term::var(&x))]);
+        let result = term.subst(&sigma).unwrap();
+        println!("{}", result);
     }
 }

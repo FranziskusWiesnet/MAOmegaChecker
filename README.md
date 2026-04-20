@@ -1,4 +1,4 @@
-# $MA^\omega$-Checker
+# $\mathsf{MA}^\omega$-Checker
 
 The present project is a proof checker for proofs in the theory $MA^\omega$.
 It is a part of my project “Material Interpretation” ([10.55776/ESP576](https://www.fwf.ac.at/forschungsradar/10.55776/ESP576)), funded by the FWF, to whom I would like to express my sincere gratitude.
@@ -6,14 +6,14 @@ It is a part of my project “Material Interpretation” ([10.55776/ESP576](http
 ## Background
 
 The proof checker was written to address an open problem, namely the characterization of all formulas in
-$MA^\omega$ for which $D^{\mathbf{F}}\to D$ is provable. The goal would be to transform a description of these formulas into a proof, and vice versa.
+$\mathsf{MA}^\omega$ for which $D^{\mathbf{F}}\to D$ is provable. The goal would be to transform a description of these formulas into a proof, and vice versa.
 A major partial success would already be an extension of this class of formulas $\mathcal{D}$, as described for example in [1,2].
 In particular, this open question arose in the context of Friedman’s A-translation and is discussed in particular in Section 7.3.1 of [2].
 A detailed presentation of the theory MA and the A-translation is given in particular in [1].
 The Rust programming language was chosen to explore how well Rust is suited as a programming language for proofs.
 The project is currently under development. I am very grateful for any comments or suggestions for improvement.
 
-## Approach to the $MA^\omega$-Checker
+## Approach to the $\mathsf{MA}^\omega$-Checker
 
 ### Types
 To be added.

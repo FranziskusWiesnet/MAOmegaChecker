@@ -54,8 +54,9 @@ impl Formula {
             Formula::Forall(x, a) =>
                 Formula::Forall(x.clone(), Box::new(a.F())),
         }
-    }
-    pub fn subst_bot(&self, formula: &Formula) -> Self {
+    }  
+    pub fn subst_bot(&self,
+                     formula: &Formula) -> Self {
         match self {
             Formula::Bottom => formula.clone(),
             Formula::Atom(_) => self.clone(),
@@ -67,7 +68,7 @@ impl Formula {
                     free_vars.extend(a.free_vars());
                     let fresh_var = new_var(x.ty(), free_vars);
                     let fresh_var_term = Term::var(&fresh_var);
-                    let sigma : TermSubstitution = HashMap::from([(x.clone(),fresh_var_term)]);
+                    let sigma: TermSubstitution = HashMap::from([(x.clone(), fresh_var_term)]);
                     let a_subst = a.subst(&sigma).unwrap();
                     Formula::Forall(fresh_var, Box::new(a_subst.subst_bot(formula)))
                 } else {
@@ -106,6 +107,22 @@ impl Formula {
                 set
             }
             Formula::Bottom => HashSet::new()
+        }
+    }
+    pub fn bounded_vars(&self) -> HashSet<ObjVar> {
+        match self {
+            Formula::Bottom => HashSet::new(),
+            Formula::Atom(t) => t.bounded_vars(),
+            Formula::Imp(prem, concl) => {
+                let mut set = prem.bounded_vars();
+                set.extend(concl.bounded_vars());
+                set
+            }
+            Formula::Forall(var, body) => {
+                let mut set = body.bounded_vars();
+                set.insert(var.clone());
+                set
+            }
         }
     }
     pub fn used_var_names(&self) -> HashSet<ObjVar> {

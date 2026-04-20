@@ -176,6 +176,22 @@ impl Axiom {
         }
         set
     }
+    pub fn bounded_vars(&self) -> HashSet<ObjVar> {
+        let mut set = HashSet::new();
+        match self {
+            Axiom::AxTrue => {},
+            Axiom::BotIntro => {},
+            Axiom::Case(b, form) => {
+                set.extend(form.bounded_vars());
+                set.insert(b.clone());
+            }
+           Axiom::Ind(var, form) => {
+               set.extend(form.bounded_vars());
+               set.insert(var.clone());
+           } 
+        }
+        set
+    }
 
     pub fn subst(&self, sigma: &TermSubstitution) -> Result<Self,TypeError> {
         match self {
