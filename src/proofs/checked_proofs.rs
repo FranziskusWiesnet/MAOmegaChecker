@@ -518,30 +518,27 @@ mod tests {
         let all_px = Formula::forall(x.clone(), px_form.clone());
         let px_to_qx =
             Formula::forall(x.clone(), Formula::imp(px_form.clone(), qx_form.clone()));
-
         let u0 = ProofAssumption::with_name(0, px_to_qx.clone(),"u0");
         let u1 = ProofAssumption::with_name(0, all_px.clone(),"u1");
-
         let proof =
             Proof::imp_intro(u0.clone(),
-                             Proof::imp_intro(u1.clone(),
-                                              Proof::all_intro(x.clone(),
-                                                               Proof::imp_elim(
-                                                                   Proof::all_elim(
-                                                                       Proof::from_assumption(
-                                                                           u0.clone()),
-                                                                       Term::var(&x)).unwrap(),
-                                                                   Proof::all_elim(
-                                                                       Proof::from_assumption(
-                                                                           u1.clone()),
-                                                                       Term::var(&x)).unwrap())
-                                                                   .unwrap()).unwrap()));
+                Proof::imp_intro(u1.clone(),
+                    Proof::all_intro(x.clone(),
+                        Proof::imp_elim(
+                            Proof::all_elim(
+                                Proof::from_assumption(
+                                    u0.clone()),
+                                Term::var(&x)).unwrap(),
+                            Proof::all_elim(
+                                Proof::from_assumption(
+                                    u1.clone()),
+                                Term::var(&x)).unwrap())
+                            .unwrap()).unwrap()));
         assert_eq!(proof.to_string(), "(λ u0. (λ u1. (λ x. ((u0 x) (u1 x)))))");
         assert_eq!(proof.formula.to_string(),
             "((∀ x. ((P x) -> (Q x))) -> ((∀ x. (P x)) -> (∀ x. (Q x))))");
         assert_eq!(proof.free_assumptions(), HashSet::new());
         assert_eq!(proof.used_assumptions(), HashSet::from_iter(vec![u0, u1]));
-
         let sigma: TypeSubstitution = HashMap::from([
             (0, Types::Nat),
             (1, Types::Nat)]);
@@ -561,7 +558,6 @@ mod tests {
         let proof_subst = proof.subst(&rho).unwrap();
         assert_ne!(proof_subst, proof);
         assert_eq!(proof_subst.subst(&rho).unwrap(), proof);
-
     }
     #[test]
     fn efq_of_atom(){
@@ -596,7 +592,7 @@ mod tests {
         assert_eq!(proof.kind.formula().unwrap(),proof.formula);
     }
     #[test]
-    fn test_subst_bot(){
+    fn subst_bot_for_implications(){
         let a = ObjVar::with_name(0, Types::Boolean, "a");
         let b = ObjVar::with_name(1, Types::Boolean, "b");
         let c = ObjVar::with_name(2, Types::Boolean, "c");
@@ -622,7 +618,6 @@ mod tests {
         // v :  b → F
         let w = ProofAssumption::new(2, a_form.clone());
         // w : a
-        
         let proof =
         Proof::all_intro( // ∀a. (a → b) → (b → F) → a → ⊥
             a, // a
@@ -642,8 +637,80 @@ mod tests {
                 ).unwrap()
             ).unwrap()
         ).unwrap())))).unwrap();
-        
         println!("{}", proof.subst_bot(&formula).formula());
+    }
+    #[test]
+    fn subst_bot_for_lists(){
+        let n = ObjVar::with_name(0, Types::Nat, "n");
+        let l = ObjVar::with_name(0, Types::List(Box::new(Types::Nat)), "l");
+        let f = ObjVar::with_name(0,
+            Types::Arr(Box::new(Types::List(Box::new(Types::Nat))),Box::new(Types::Boolean)),
+            "f");
+        let n_term = Term::var(&n);
+        let l_term = Term::var(&l);
+        let f_term = Term::var(&f);
         
+        let fnil = Term::app(&f_term, &Term::constant(Const::Nil(Types::Nat))).unwrap();
+        let fnil_form = Formula::atom(&fnil).unwrap();
+        let fl = Term::app(&f_term, &l_term).unwrap();
+        let fl_form = Formula::atom(&fl).unwrap();
+        let cons = Term::constant(Const::Cons(Types::Nat));
+        let nl = Term::app(&Term::app(&cons, &n_term).unwrap(),&l_term).unwrap();
+        let fnl = Term::app(&f_term,&nl).unwrap();
+        let fnl_form = Formula::atom(&fnl).unwrap();
+        let u = ProofAssumption::new(0,
+            Formula::forall(n.clone(),
+            Formula::forall(l.clone(),Formula::imp(fnl_form.clone(),fl_form.clone()))));
+        // u : ∀ n,l. (f (n::l) → f l)
+        let v = ProofAssumption::new(1,
+        Formula::imp(fnil_form.clone(),Formula::Bottom));
+        // v : f[] → ⊥
+        let w = ProofAssumption::new(2,
+        Formula::imp(fl_form.clone(),Formula::Bottom));
+        // w : f l → ⊥
+        let z = ProofAssumption::new(3,
+            fnl_form.clone());
+        // z : f (n::l)
+        let lemma =
+            Proof::all_intro( // ∀ n,l ((f l → ⊥) → f (n::l) → ⊥)
+                n.clone(), // n
+                Proof::all_intro( // ∀ l ((f l → ⊥) → f (n::l) → ⊥)
+                    l.clone(), // l
+                    Proof::imp_intro( // (f l → ⊥) → f (n::l) → ⊥
+                        w.clone(), // f l → ⊥
+                        Proof::imp_intro( // f (n::l) → ⊥
+                            z.clone(), // f (n::l)
+                            Proof::imp_elim( // ⊥
+                                Proof::from_assumption(w.clone()), // f l → ⊥
+                                Proof::imp_elim( // f l
+                                    Proof::all_elim( // f (n::l) → f l
+                                        Proof::all_elim( // ∀ l (f (n::l) → f l)
+                                            Proof::from_assumption(u.clone()), // ∀ n,l (f (n::l) → f l)
+                                            n_term.clone()).unwrap(), // n
+                                        l_term.clone()).unwrap(),  // l
+                                    Proof::from_assumption(z.clone()), // f (n :: l)
+                                ).unwrap(),
+                            ).unwrap()))).unwrap()).unwrap();
+        let proof =
+        Proof::imp_intro(
+            u.clone(),
+        Proof::all_intro(
+            l.clone(),
+            Proof::imp_elim(
+                Proof::imp_elim( // ∀n,l ((f l → ⊥) → f (n::l) → ⊥) → f l → ⊥
+                    Proof::all_elim( // (f[] → ⊥) → ∀n,l ((f l → ⊥) → f (n::l) → ⊥) → f l → ⊥
+                        Proof::from_axiom(Axiom::Ind(l, Formula::imp(fl_form, Formula::Bottom)))
+                        .unwrap() ,// ∀l ((f[] → ⊥) → ∀n,l ((f l → ⊥) → f (n::l) → ⊥) → f l → ⊥)
+                        l_term) // l
+                    .unwrap(),
+                    Proof::from_assumption(v.clone())) // f[] → ⊥
+                .unwrap(),
+                lemma, // ∀ n,l ((f l → ⊥) → f (n::l) → ⊥)
+            ).unwrap()).unwrap());
+        assert_eq!(proof.free_assumptions(),HashSet::from([v]));
+        let subst_proof = proof.subst_bot(&fnl_form);
+        let assumption = ProofAssumption::new(0,
+        Formula::imp(fnil_form.clone(),fnl_form.clone()));
+        assert_eq!(subst_proof.free_assumptions(),HashSet::from([assumption]));
     }
 }
