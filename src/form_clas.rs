@@ -866,7 +866,6 @@ pub fn prop_i (formula: &Formula) -> bool {
     }
 }
 
-
 #[cfg(test)]
 
 mod tests {

@@ -473,8 +473,10 @@ pub fn subst_assumption(&self, sigma: &ProofKindSubstitution) -> Self {
                 match axiom {
                     Axiom::AxTrue => Ok(self.clone()),
                     Axiom::BotIntro => Ok(Proof::efq(formula).kind().clone()),
-                    Axiom::Case(b, a) => todo!(),
-                    Axiom::Ind(x, a) => todo!(),
+                    Axiom::Case(b, a) =>
+                        Ok(ProofKind::Ax(Axiom::Case(b.clone(), a.subst_bot(formula)))),
+                    Axiom::Ind(x, a) =>
+                        Ok(ProofKind::Ax(Axiom::Ind(x.clone(), a.subst_bot(formula)))),
                 }
             }
             ProofKind::ImpIntro(u, m) => {
