@@ -701,7 +701,19 @@ pub fn r_proof(formula: &Formula) -> Option<Proof> {
                 &v, // (F → F) → ⊥
                 proof)) // ⊥
         },
-        Formula::Atom(_) => None,
+        Formula::Atom(t) => {
+            if *t == Term::tt() {
+              let u = ProofAssumption::new(0,
+                  imp(&imp(&Formula::verum(), &F()),&Formula::Bottom));
+                // u : ¬T → ⊥
+                return
+                    Some(
+                        imp_intro( // (¬T → ⊥) → T
+                            &u, // ¬T → ⊥
+                            axiom(Axiom::AxTrue)?)) // T
+            }
+            None
+        },
         Formula::Forall(x, body) => {
             // Case ∀x.A
             let m = r_proof(body)?;

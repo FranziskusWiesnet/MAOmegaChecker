@@ -112,7 +112,7 @@ fn isNegBot(formula: &Formula) -> Option<Formula> {
 }
 fn isUniversalStab(formula: &Formula) -> Option<Formula> {
     match formula {
-        Formula::Forall(x, A) => isUniversalStab(A.as_ref()),
+        Formula::Forall(_, A) => isUniversalStab(A.as_ref()),
         _ => isStab(formula)
     }
 }
@@ -133,7 +133,7 @@ fn main() {
     let x = ObjVar::with_name(0, xi, "x");
     let qx = Term::app(&Term::var(&q), &Term::var(&x)).unwrap();
     let qx_form = Formula::Atom(qx.clone());
-    let Stab = Stab(&qx_form);
+    let _Stab = Stab(&qx_form);
     let S = all(&x, &imp(&imp(&imp(&qx_form, &F), &F), &qx_form));
     let AllQx = all(&x, &qx_form);
     let T = imp(&imp(&AllQx, &bot), &bot);

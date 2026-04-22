@@ -545,7 +545,8 @@ mod tests {
         let proof_subst_types = proof.subst_type(&sigma);
         let p_subst: ObjVar = ObjVar::new(0, Types::arr(Types::Nat, Types::Boolean));
         let q_subst: ObjVar = ObjVar::new(1, Types::arr(Types::Nat, Types::Boolean));
-        assert_eq!(proof_subst_types.formula.free_vars(), HashSet::from_iter([p_subst, q_subst]));
+        assert_eq!(proof_subst_types.formula.free_vars(),
+            HashSet::from_iter([p_subst, q_subst]));
         let id: TermSubstitution = HashMap::from([
             (q.clone(), Term::var(&q)),
         ]);
@@ -604,7 +605,6 @@ mod tests {
         let a_form = Formula::atom(&a_term).unwrap();
         let b_form = Formula::atom(&b_term).unwrap();
         let c_form = Formula::atom(&c_term).unwrap();
-        let bot = Formula::Bottom;
         
         let formula =
             Formula::imp(a_form.clone(), Formula::imp(b_form.clone(),c_form.clone()));
@@ -619,24 +619,24 @@ mod tests {
         let w = ProofAssumption::new(2, a_form.clone());
         // w : a
         let proof =
-        Proof::all_intro( // ∀a. (a → b) → (b → F) → a → ⊥
-            a, // a
-            Proof::imp_intro( // (a → b) → (b → F) → a → ⊥
-                u.clone(), // a → b
-            Proof::imp_intro( // (b → F) → a → ⊥
-                v.clone(), // b → F
-        Proof::imp_intro( // a → ⊥
-            w.clone(), // a
-        Proof::imp_elim( // ⊥
-        Proof::from_axiom(Axiom::BotIntro).unwrap(),// F → ⊥
-            Proof::imp_elim( // F
-                Proof::from_assumption(v.clone()), // b → F
-                Proof::imp_elim( // b
-                    Proof::from_assumption(u.clone()), // a → b
-                    Proof::from_assumption(w.clone()) // a
-                ).unwrap()
-            ).unwrap()
-        ).unwrap())))).unwrap();
+            Proof::all_intro( // ∀a. (a → b) → (b → F) → a → ⊥
+                a, // a
+                Proof::imp_intro( // (a → b) → (b → F) → a → ⊥
+                    u.clone(), // a → b
+                    Proof::imp_intro( // (b → F) → a → ⊥
+                        v.clone(), // b → F
+                        Proof::imp_intro( // a → ⊥
+                            w.clone(), // a
+                            Proof::imp_elim( // ⊥
+                                Proof::from_axiom(Axiom::BotIntro).unwrap(), // F → ⊥
+                                Proof::imp_elim( // F
+                                    Proof::from_assumption(v.clone()), // b → F
+                                    Proof::imp_elim( // b
+                                        Proof::from_assumption(u.clone()), // a → b
+                                        Proof::from_assumption(w.clone()), // a
+                                    ).unwrap(),
+                                ).unwrap(),
+                            ).unwrap())))).unwrap();
         println!("{}", proof.subst_bot(&formula).formula());
     }
     #[test]
@@ -692,20 +692,20 @@ mod tests {
                                 ).unwrap(),
                             ).unwrap()))).unwrap()).unwrap();
         let proof =
-        Proof::imp_intro(
-            u.clone(),
-        Proof::all_intro(
-            l.clone(),
-            Proof::imp_elim(
+        Proof::imp_intro( // ∀ n,l (f (n::l) → f l) → ∀ l (f l → ⊥)
+            u.clone(), // ∀ n,l (f (n::l) → f l)
+        Proof::all_intro( // ∀ l. f l → ⊥
+            l.clone(), // l
+            Proof::imp_elim( // f l → ⊥
                 Proof::imp_elim( // ∀n,l ((f l → ⊥) → f (n::l) → ⊥) → f l → ⊥
                     Proof::all_elim( // (f[] → ⊥) → ∀n,l ((f l → ⊥) → f (n::l) → ⊥) → f l → ⊥
                         Proof::from_axiom(Axiom::Ind(l, Formula::imp(fl_form, Formula::Bottom)))
-                        .unwrap() ,// ∀l ((f[] → ⊥) → ∀n,l ((f l → ⊥) → f (n::l) → ⊥) → f l → ⊥)
+                        .unwrap(), // ∀l ((f[] → ⊥) → ∀n,l ((f l → ⊥) → f (n::l) → ⊥) → f l → ⊥)
                         l_term) // l
                     .unwrap(),
                     Proof::from_assumption(v.clone())) // f[] → ⊥
                 .unwrap(),
-                lemma, // ∀ n,l ((f l → ⊥) → f (n::l) → ⊥)
+                lemma, // ∀ n,l. (f l → ⊥) → f (n::l) → ⊥
             ).unwrap()).unwrap());
         assert_eq!(proof.free_assumptions(),HashSet::from([v]));
         let subst_proof = proof.subst_bot(&fnl_form);
