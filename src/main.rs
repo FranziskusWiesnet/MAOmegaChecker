@@ -11,52 +11,13 @@ use crate::types::Types;
 use crate::terms::obj_var::ObjVar;
 use crate::terms::Term;
 use crate::terms::Const;
-use crate::formulas::{Formula, is_qfree, Stab};
+use crate::formulas::{Formula, Stab};
 use crate::types::Types::TypeVar;
 
 
 fn setPrint(formula: &Formula) -> bool {
     println!("{}", formula);
     true
-}
-
-
-fn setD(formula: &Formula) -> bool {
-    match formula {
-        Formula::Bottom => true,
-        Formula::Atom(_) => true,
-        Formula::Forall(_, A) => setD(A) || setR(A),
-        Formula::Imp(A, B) => setI(A) && setD(B) || setG(A) && setR(B),
-    }
-}
-
-fn setG(formula: &Formula) -> bool {
-    match formula {
-        Formula::Bottom => true,
-        Formula::Atom(_) => true,
-        Formula::Forall(_, A) => setI(A),
-        Formula::Imp(A, B) =>
-            setR(A) && setG(B) ||
-            setD(A) && setG(B) && setPrint(A) && is_qfree(A) ||
-                //setD(A) && setI(A) && setG(B) && setPrint(A) && setPrint(B) ||
-                setD(A) && setI(B)
-    }
-}
-fn setR(formula: &Formula) -> bool {
-    match formula {
-        Formula::Bottom => true,
-        Formula::Atom(_) => true,
-        Formula::Forall(_, A) => setR(A),
-        Formula::Imp(A, B) => setG(A) && setR(B),
-    }
-}
-fn setI(formula: &Formula) -> bool {
-    match formula {
-        Formula::Bottom => false,
-        Formula::Atom(_) => true,
-        Formula::Forall(_, A) => setI(A),
-        Formula::Imp(A, B) => setD(A) && setI(B),
-    }
 }
 
 fn isStab(formula: &Formula) -> Option<Formula> {
@@ -143,8 +104,6 @@ fn main() {
     println!("{:?}", d_proof(&StoT));
     let B = imp(&imp(&qx_form, &bot), &bot);
     println!("{B}");
-    println!("{}", setG(&B));
-    println!("{}", setD(&StoT));
     println!("{}",d_proof(&B).unwrap().formula());
     println!("{}", isStab(&S.kernel()).unwrap());
     println!("{}", isNegBot(&T).unwrap().kernel());

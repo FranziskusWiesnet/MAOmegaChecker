@@ -10,6 +10,7 @@ use crate::types::{TypeError, Types, TypeSubstitution};
 pub enum Formula {
     Atom(Term),
     Imp(Box<Formula>, Box<Formula>),
+    And(Box<Formula>, Box<Formula>),
     Forall(ObjVar, Box<Formula>),
     Bottom,
 }
@@ -24,7 +25,8 @@ impl fmt::Display for Formula {
                     write!(f, "F")
                 } else {
                     write!(f, "{}",t)}},
-            Formula::Imp(a, b) => write!(f, "({} -> {})", a, b),
+            Formula::Imp(a, b) => write!(f, "({} → {})", a, b),
+            Formula::And(a, b) => write!(f, "({} ∧ {})", a, b),
             Formula::Forall(x, a) => write!(f, "(∀ {}. {})", x, a),
         }
     }
@@ -39,6 +41,7 @@ impl Formula {
     pub fn imp(a: Formula, b: Formula) -> Self {
         Formula::Imp(Box::new(a), Box::new(b))
     }
+    pub fn and(a: Formula, b: Formula) -> Self { Formula::And(Box::new(a), Box::new(b)) }
     pub fn forall(x: ObjVar, a: Formula) -> Self {
         Formula::Forall(x.clone(), Box::new(a))
     }
@@ -51,6 +54,8 @@ impl Formula {
             Formula::Atom(_) => self.clone(),
             Formula::Imp(a, b) =>
                 Formula::Imp(Box::new(a.F()), Box::new(b.F())),
+            Formula::And(a, b) =>
+                Formula::And(Box::new(a.F()), Box::new(b.F())),
             Formula::Forall(x, a) =>
                 Formula::Forall(x.clone(), Box::new(a.F())),
         }
@@ -62,6 +67,8 @@ impl Formula {
             Formula::Atom(_) => self.clone(),
             Formula::Imp(a, b) =>
                 Formula::Imp(Box::new(a.subst_bot(formula)), Box::new(b.subst_bot(formula))),
+            Formula::And(a, b) =>
+                Formula::And(Box::new(a.subst_bot(formula)), Box::new(b.subst_bot(formula))),
             Formula::Forall(x, a) => {
                 let mut free_vars = formula.free_vars();
                 if free_vars.contains(&x) {
@@ -85,6 +92,11 @@ impl Formula {
                 set.extend(concl.free_type_vars());
                 set
             }
+            Formula::And(conj1, conj2) => {
+                let mut set = conj1.free_type_vars();
+                set.extend(conj2.free_type_vars());
+                set
+            }
             Formula::Forall(var, body) => {
                 let mut set = var.free_type_vars();
                 set.extend(body.free_type_vars());
@@ -99,6 +111,11 @@ impl Formula {
             Formula::Imp(prem, concl) => {
                 let mut set = prem.free_vars();
                 set.extend(concl.free_vars());
+                set
+            }
+            Formula::And(conj1, conj2) => {
+                let mut set = conj1.free_vars();
+                set.extend(conj2.free_vars());
                 set
             }
             Formula::Forall(var, body) => {
@@ -118,6 +135,11 @@ impl Formula {
                 set.extend(concl.bounded_vars());
                 set
             }
+            Formula::And(conj1, conj2) => {
+                let mut set = conj1.bounded_vars();
+                set.extend(conj2.bounded_vars());
+                set
+            }
             Formula::Forall(var, body) => {
                 let mut set = body.bounded_vars();
                 set.insert(var.clone());
@@ -128,6 +150,11 @@ impl Formula {
     pub fn used_var_names(&self) -> HashSet<ObjVar> {
         match self {
             Formula::Atom(t) => t.used_var_names(),
+            Formula::And(conj1, conj2) => {
+                let mut set = conj1.used_var_names();
+                set.extend(conj2.used_var_names());
+                set
+            }
             Formula::Imp(prem, conclusion) => {
                 let mut set = prem.used_var_names();
                 set.extend(conclusion.used_var_names());
@@ -155,7 +182,10 @@ impl Formula {
                 Box::new(a.subst_type_with_map(sigma, var_subst)),
                 Box::new(b.subst_type_with_map(sigma, var_subst)),
             ),
-
+            Formula::And(a, b) => Formula::And(
+                Box::new(a.subst_type_with_map(sigma, var_subst)),
+                Box::new(b.subst_type_with_map(sigma, var_subst)),
+            ),
             Formula::Forall(v, f) =>
                 match var_subst.get(v) {
                     Some(var) =>
@@ -176,7 +206,10 @@ impl Formula {
                 Box::new(a.subst_type(sigma)),
                 Box::new(b.subst_type(sigma)),
             ),
-
+            Formula::And(a, b) => Formula::And(
+                Box::new(a.subst_type(sigma)),
+                Box::new(b.subst_type(sigma)),
+            ),
             Formula::Forall(v, f) => Formula::Forall(
                 v.subst_type(sigma),
                 Box::new(f.subst_type(sigma)),
@@ -200,6 +233,14 @@ impl Formula {
                     let s = a.subst(sigma)?;
                     let t = b.subst(sigma)?;
                     Ok(Formula::imp(s,t))
+                }
+            Formula::And(a, b) =>
+                {
+                    // In both cases, we check the substitution.
+                    // This could probably be done more efficiently.
+                    let s = a.subst(sigma)?;
+                    let t = b.subst(sigma)?;
+                    Ok(Formula::and(s,t))
                 }
 
             Formula::Forall(var, body) => {
@@ -250,6 +291,8 @@ impl PartialEq for Formula {
                     HashMap::from([(y.clone(),Term::var(&fresh_var.clone()))]);
                 a.subst(&sigma_x) == b.subst(&sigma_y)
             }
+            (Formula::And(a,b),
+                Formula::And(c,d)) => a == c && b == d,
             _ => false,
         }
     }
@@ -278,8 +321,13 @@ impl Formula {
                 a.hash_rec(state, env, depth);
                 b.hash_rec(state, env, depth);
             }
-            Formula::Forall(v,body) => {
+            Formula::And(a,b) => {
                 3u8.hash(state);
+                a.hash_rec(state, env, depth);
+                b.hash_rec(state, env, depth);
+            }
+            Formula::Forall(v,body) => {
+                4u8.hash(state);
                 v.ty().hash(state);
                 let old = env.insert(v.clone(), depth);
                 body.hash_rec(state, env, depth + 1);
@@ -311,6 +359,7 @@ pub fn is_qfree(formula: &Formula) -> bool {
         Formula::Atom(_) => true,
         Formula::Forall(_, _) => false,
         Formula::Imp(g, h) => is_qfree(&g) && is_qfree(&h),
+        Formula::And (g, h)  => is_qfree(&g) && is_qfree(&h),
     }
 }
 

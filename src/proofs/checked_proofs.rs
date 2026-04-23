@@ -14,7 +14,7 @@ pub struct Proof {
     kind: ProofKind,
 }
 impl fmt::Display for Proof {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result  {
         write!(f, "{}", self.kind)
     }
 }
@@ -63,38 +63,78 @@ impl Proof {
             _ => Err(ProofError::ExpectedImplication(prem_to_conclusion)),
         }
     }
-        pub fn all_intro(var: ObjVar, proof: Proof) -> Result<Self,ProofError> {
-            let free_assumption_vars = proof.kind.free_vars_in_assumptions();
-            if free_assumption_vars.contains(&var) {
-                Err(ProofError::AllIntro(var,proof.kind))
-            } else {
-                Ok(Self{
-                    formula: Formula::forall(var.clone(), proof.formula),
-                    kind: ProofKind::AllIntro(var.clone(), Box::new(proof.kind))
+    pub fn and_intro(left: Proof, right: Proof) -> Self {
+        Self {
+            formula: Formula::and(left.formula, right.formula),
+            kind: ProofKind::AndIntro(Box::new(left.kind), Box::new(right.kind)),
+        }
+    }
+    pub fn left(m: Proof) -> Result<Self,ProofError> {
+        let conjunction = m.formula;
+        match conjunction {
+            Formula::And(m0,_) => {
+                Ok(Self {
+                    formula: m0.as_ref().clone(),
+                    kind: ProofKind::AndElim0(Box::new(m.kind))
                 })
             }
+            _ => return Err(ProofError::ExpectedConjunction(conjunction)),
         }
-        pub fn all_elim(proof: Proof, term: Term) -> Result<Self,ProofError> {
-            let forall_formula = proof.formula;
-            match forall_formula {
-                Formula::Forall(var,form) => {
-                    let sigma: TermSubstitution =HashMap::from([(var.clone(), term.clone())]);
-                    match form.subst(&sigma) {
-                        Ok(formula_subst) => Ok(Self {
-                            formula: formula_subst,
-                            kind: ProofKind::AllElim(Box::new(proof.kind),term)
-                        }),
-                        Err(e) => Err(ProofError::Type(e)),
-                    }
-                }
-                _ => Err(ProofError::ExpectedForall(forall_formula)),
+    }
+    pub fn right(m: Proof) -> Result<Self,ProofError> {
+        let conjunction = m.formula;
+        match conjunction {
+            Formula::And(_,m1) => {
+                Ok(Self {
+                    formula: m1.as_ref().clone(),
+                    kind: ProofKind::AndElim1(Box::new(m.kind))
+                })
             }
+            _ => return Err(ProofError::ExpectedConjunction(conjunction)),
         }
+    }
+    pub fn all_intro(var: ObjVar, proof: Proof) -> Result<Self, ProofError> {
+        let free_assumption_vars = proof.kind.free_vars_in_assumptions();
+        if free_assumption_vars.contains(&var) {
+            Err(ProofError::AllIntro(var, proof.kind))
+        } else {
+            Ok(Self {
+                formula: Formula::forall(var.clone(), proof.formula),
+                kind: ProofKind::AllIntro(var.clone(), Box::new(proof.kind)),
+            })
+        }
+    }
+    pub fn all_elim(proof: Proof, term: Term) -> Result<Self, ProofError> {
+        let forall_formula = proof.formula;
+        match forall_formula {
+            Formula::Forall(var, form) => {
+                let sigma: TermSubstitution = HashMap::from([(var.clone(), term.clone())]);
+                match form.subst(&sigma) {
+                    Ok(formula_subst) => Ok(Self {
+                        formula: formula_subst,
+                        kind: ProofKind::AllElim(Box::new(proof.kind), term),
+                    }),
+                    Err(e) => Err(ProofError::Type(e)),
+                }
+            }
+            _ => Err(ProofError::ExpectedForall(forall_formula)),
+        }
+    }
     pub fn from_kind(kind: ProofKind) -> Result<Self, ProofError> {
         match kind.clone() {
             ProofKind::Assumption(assumption) =>
                 Ok(Self::from_assumption(assumption)),
             ProofKind::Ax(ax) => Self::from_axiom(ax),
+            ProofKind::AndIntro(n,m) =>
+            Ok(Self::and_intro(
+                Self::from_kind(n.as_ref().clone())?,
+                Self::from_kind(m.as_ref().clone())?)),
+            ProofKind::AndElim0(m) => {
+                Self::left(Self::from_kind(m.as_ref().clone())?)
+            }
+            ProofKind::AndElim1(m) => {
+                Self::right(Self::from_kind(m.as_ref().clone())?)
+            }
             ProofKind::ImpIntro(u, m) =>
                 Ok(Self::imp_intro(u,Self::from_kind(m.as_ref().clone())?)),
             ProofKind::ImpElim(n, m) =>
@@ -171,6 +211,23 @@ impl Proof {
                         Box::new(ProofKind::AllElim(Box::new(ProofKind::Ax(Axiom::Case(b.clone(),Formula::Atom(Term::var(&b))))),t.clone())),
                         Box::new(ProofKind::Ax(Axiom::AxTrue))
                     )
+                }
+            }
+            Formula::And(left, right) => {
+                let efq_left = Proof::efq(left);
+                let efq_right = Proof::efq(right);
+                let u = ProofAssumption::new(0, Formula::falsum());
+                Self {
+                    formula: Formula::imp(Formula::falsum(), form.clone()),
+                    kind:
+                    ProofKind::ImpIntro(
+                        u.clone(),
+                        Box::new(ProofKind::AndIntro(
+                            Box::new(ProofKind::ImpElim(Box::new(efq_left.kind),
+                                Box::new(ProofKind::Assumption(u.clone())))),
+                            Box::new(ProofKind::ImpElim(Box::new(efq_right.kind),
+                                Box::new(ProofKind::Assumption(u)))),
+                        ))),
                 }
             }
             Formula::Imp(premise, conclusion) => {

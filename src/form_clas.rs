@@ -9,6 +9,9 @@ use crate::types::Types;
 fn imp(a: &Formula, b: &Formula) -> Formula {
     Formula::Imp(Box::new(a.clone()), Box::new(b.clone()))
 }
+fn and(a: &Formula, b: &Formula) -> Formula {
+    Formula::And(Box::new(a.clone()), Box::new(b.clone()))
+}
 fn all(x: &ObjVar, a: &Formula) -> Formula {
     Formula::Forall(x.clone(), Box::new(a.clone()))
 }
@@ -18,6 +21,21 @@ fn F() -> Formula {
 }
 fn ass(u : &ProofAssumption) -> Proof {
     Proof::from_assumption(u.clone())
+}
+fn and_intro(m : Proof, n : Proof) -> Proof {
+    Proof::and_intro(m, n)
+}
+fn proj_left (m : Proof) -> Option<Proof> {
+    match Proof::left(m) {
+        Ok(x) => Some(x),
+        Err(_) => None,
+    }
+}
+fn proj_right (m : Proof) -> Option<Proof> {
+    match Proof::right(m) {
+        Ok(x) => Some(x),
+        Err(_) => None,
+    }
 }
 fn imp_elim(m: Proof, n : Proof) -> Option<Proof> {
     match Proof::imp_elim(m, n) {
@@ -249,6 +267,82 @@ pub fn case_dist(formula: &Formula, goal: &Formula) -> Option<Proof> {
                                     proof3)?)?))) // ¬A → ¬B → goal
             } else {None}
         }
+        Formula::And(left,right) => {
+            // Case A ∧ B
+            if let (Some(m), Some(n)) =
+                (case_dist(&left, &imp(&right, goal)),
+                    case_dist(&right, goal)) {
+                // m : (A → B → goal) → (¬A → B → goal) → B → goal
+                // n : (B → goal) → (¬B → goal) → goal
+                let u = ProofAssumption::new(0, imp(&and(&left,&right), goal));
+                // u : A ∧ B → goal
+                let v = ProofAssumption::new(1,
+                    imp(&imp(&and(&left,&right), &F()), goal));
+                // v : ¬(A ∧ B) → goal
+                let w = ProofAssumption::new(2, and(left, right));
+                // w : A ∧ B
+                let u_a = ProofAssumption::new(3, left.as_ref().clone());
+                // u_a : A
+                let u_b = ProofAssumption::new(4, right.as_ref().clone());
+                // u_b : B
+                let neg_a = ProofAssumption::new(5, imp(left, &F()));
+                // neg_a : ¬A
+                let neg_b = ProofAssumption::new(6, imp(right, &F()));
+                // neg_b : ¬B
+                let proof_b_to_goal =
+                    imp_elim( // B → goal
+                        imp_elim( // (¬A → B → goal) → B → goal
+                            m, // (A → B → goal) → (¬A → B → goal) → B → goal
+                            imp_intro( // A → B → goal
+                                &u_a, // A
+                                imp_intro( // B → goal
+                                    &u_b, // B
+                                    imp_elim( // goal
+                                        ass(&u), // A ∧ B → goal
+                                        and_intro( // A ∧ B
+                                            ass(&u_a), // A
+                                            ass(&u_b), // B
+                                        ))?)))?,
+                        imp_intro( // ¬A → B → goal
+                            &neg_a, // ¬A
+                            imp_intro( // B → goal
+                                &u_b, // B
+                                imp_elim( // goal
+                                    ass(&v), // ¬(A ∧ B) → goal
+                                    imp_intro( // ¬(A ∧ B)
+                                        &w, // A ∧ B
+                                        imp_elim( // F
+                                            ass(&neg_a), // ¬A
+                                            proj_left( // A
+                                                ass(&w) // A ∧ B
+                                            )?)?))?)))?;
+                
+                let proof_neg_b_to_goal =
+                imp_intro( // ¬B → goal
+                    &neg_b, // ¬B
+                imp_elim( //goal
+                    ass(&v), // ¬(A ∧ B) → goal
+                imp_intro( // ¬(A ∧ B)
+                    &w, // A ∧ B
+                imp_elim( // F
+                    ass(&neg_b), // ¬B
+                    proj_right( // B
+                        ass(&w))?)?))?);// A ∧ B
+                Some(
+                    imp_intro( // (A ∧ B → goal) → (¬(A ∧ B) → goal) → goal
+                        &u, // A ∧ B → goal
+                        imp_intro( // (¬(A ∧ B) → goal) → goal
+                            &v, // ¬(A ∧ B) → goal
+                            imp_elim( // goal
+                                imp_elim( // (¬B → goal) → goal
+                                    n, // (B → goal) → (¬B → goal) → goal
+                                    proof_b_to_goal)?, // B → goal
+                                proof_neg_b_to_goal)?))) // ¬B → goal
+            }
+            else {
+                None
+            }
+        },
         Formula::Forall(var, a) => {
             // Case ∀ var.A
             if *var.ty() == Types::Boolean {
@@ -281,7 +375,7 @@ pub fn case_dist(formula: &Formula, goal: &Formula) -> Option<Proof> {
                         // u11 : ¬A(ff)
                         let w = ProofAssumption::new(6, all(&var, a));
                         // w : ∀ var.A(var)
-                        let proof00 =
+                        let proof00  =
                             imp_intro( // A(tt) → A(ff) → goal
                                 &u00, // A(tt)
                                 imp_intro( // A(ff) → goal
@@ -407,6 +501,28 @@ pub fn d_proof(formula: &Formula) -> Option<Proof> {
                                 ass(&u), // ∀x.A^F
                                 term_x)?)?)?)) // x
         }
+        Formula::And(a,b) => {
+            // Case A ∧ B
+            if let (Some(m),Some(n)) = (d_proof(a),d_proof(b)) {
+                // m : A^F → A
+                // n : B^F → B
+                let u = ProofAssumption::new(0, and(a.as_ref(),b.as_ref()).F());
+                // u : (A ∧ B)^F
+                Some(
+                    imp_intro( // (A ∧ B)^F → A ∧ B
+                        &u, // (A ∧ B)^F
+                        and_intro( // A ∧ B
+                            imp_elim( // A
+                                m, // A^F → A
+                            proj_left( // A^F
+                                ass(&u))?)?, // (A ∧ B)^F
+                            imp_elim( // B
+                                n, // B^F → B
+                                proj_right( // B^F
+                                    ass(&u))?)?))) // (A ∧ B)^F
+            }
+            else {None}
+        },
         Formula::Imp(a, b) =>  {
             // Case A → B
             if let (Some(m),Some(n)) = (i_proof(a),d_proof(b)) {
@@ -499,6 +615,47 @@ pub fn g_proof(formula: &Formula) -> Option<Proof> {
                         imp_elim( // ⊥
                             ass(&v), // A → ⊥
                             ass(&u))?))) // A
+        },
+        Formula::And(a,b) => {
+            // Case A ∧ B
+            if let (Some(m),Some(n)) = (g_proof(a), g_proof(b)) {
+                // m : A → (A^F → ⊥) → ⊥
+                // n : B → (B ^F → ⊥) → ⊥
+                let u = ProofAssumption::new(0, and(a.as_ref(),b.as_ref()));
+                // u : A ∧ B
+                let v = ProofAssumption::new(1,
+                    imp(&and(a.as_ref(),b.as_ref()).F(),&Formula::Bottom));
+                // v : (A ∧ B)^F → ⊥
+                let w = ProofAssumption::new(2, a.as_ref().F());
+                // w : A^F
+                let z = ProofAssumption::new(3, b.as_ref().F());
+                // z : B^F
+                Some(
+                imp_intro( // A ∧ B → ((A ∧ B)^F → ⊥) → ⊥
+                    &u, // A ∧ B
+                imp_intro( // ((A ∧ B)^F → ⊥) → ⊥
+                    &v, // (A ∧ B)^F → ⊥
+                imp_elim( // ⊥
+                    imp_elim( // (B ^F → ⊥) → ⊥
+                        n, // B → (B ^F → ⊥) → ⊥
+                        proj_right( // B
+                            ass(&u))?)?, // A ∧ B
+                    imp_intro( // B^F → ⊥
+                        &z, // B^F
+                        imp_elim( // ⊥
+                            imp_elim( // (A^F → ⊥) → ⊥
+                                m, //  A → (A^F → ⊥) → ⊥
+                                proj_left( // A
+                                    ass(&u))?)?, // A ∧ B
+                            imp_intro( // A^F → ⊥
+                                &w, // A^F
+                                imp_elim(  // ⊥
+                                    ass(&v), // (A ∧ B)^F → ⊥
+                                    and_intro( // (A ∧ B)^F
+                                        ass(&w), // A^F
+                                        ass(&z)))?))?))?))) // B^F
+                
+            } else {None}
         },
         Formula::Forall(x, body) => {
             // Case ∀x.A
@@ -714,6 +871,54 @@ pub fn r_proof(formula: &Formula) -> Option<Proof> {
             }
             None
         },
+        Formula::And(left,right) => {
+            // Case A ∧ B
+            if let (Some(m), Some(n)) = (r_proof(left), r_proof(right)) {
+                // m : (¬A^F → ⊥) → A
+                // n : (¬B^F → ⊥) → B
+                let u = ProofAssumption::new(0,
+                    imp(&imp(&and(left.as_ref(),right.as_ref()).F(), &F()),&Formula::Bottom));
+                // u : ¬(A ∧ B)^F → ⊥)
+                let v = ProofAssumption::new(1,
+                    and(left.as_ref(),right.as_ref()).F());
+                // v : (A ∧ B)^F
+                 let w = ProofAssumption::new(2,
+                 imp(&left.as_ref().F(),&F()));
+                // w : ¬A^F
+                let z = ProofAssumption::new(3,
+                    imp(&right.as_ref().F(),&F()));
+                // w : ¬B^F
+                Some(
+                    imp_intro( // ¬(A ∧ B)^F → ⊥) → A ∧ B
+                        &u, // ¬(A ∧ B)^F → ⊥)
+                        and_intro( // A ∧ B
+                            imp_elim( // A
+                                m, // (¬A^F → ⊥) → A
+                                imp_intro( // ¬A^F → ⊥
+                                    &w, // ¬A^F
+                                    imp_elim( // ⊥
+                                        ass(&u), // ¬(A ∧ B)^F → ⊥
+                                        imp_intro( // ¬(A ∧ B)^F
+                                            &v, // (A ∧ B)^F
+                                            imp_elim( // F
+                                                ass(&w), // ¬A^F
+                                                proj_left( // A^F
+                                                    ass(&v))?)?))?))?, // (A ∧ B)^F
+                            imp_elim( // B
+                                n, // (¬B^F → ⊥) → B
+                                imp_intro( // ¬B^F → ⊥
+                                    &z, // ¬B^F
+                                    imp_elim( // ⊥
+                                        ass(&u), // ¬(A ∧ B)^F → ⊥
+                                        imp_intro( // ¬(A ∧ B)^F
+                                            &v, // (A ∧ B)^F
+                                            imp_elim( // F
+                                                ass(&z), // ¬B^F
+                                                proj_right( // B^F
+                                                    ass(&v))?)?))?))?))) // (A ∧ B)^F
+                
+            } else {None}
+        },
         Formula::Forall(x, body) => {
             // Case ∀x.A
             let m = r_proof(body)?;
@@ -803,6 +1008,27 @@ pub fn i_proof(formula: &Formula) -> Option<Proof>{
             let u = ProofAssumption::new(0, formula.clone());
             Some(imp_intro(&u, ass(&u))) // A → A
         },
+        Formula::And(left,right) => {
+            // Case A ∧ B
+            if let (Some(m),Some(n)) = (i_proof(left),i_proof(right)) {
+                // m : A → A^F
+                // n : B → B ^F
+                let u = ProofAssumption::new(0, and(left,right));
+                // u : A ∧ B
+                Some(
+                imp_intro( // A ∧ B → (A ∧ B)^F
+                    &u, // A ∧ B
+                    and_intro( // (A ∧ B)^F
+                        imp_elim( // A^F
+                            m, // A → A^F
+                            proj_left( // A
+                                ass(&u))?)?, // A ∧ B
+                        imp_elim( // B^F
+                            n, // B → B^F
+                            proj_right( // B
+                                ass(&u))?)?))) // A ∧ B
+            } else {None}
+        }
         Formula::Forall(x, body) => {
             // Case ∀x.A
             let u = ProofAssumption::new(0, all(x, body));
@@ -955,6 +1181,42 @@ mod tests {
         assert_eq!(proof.free_assumptions(), HashSet::new());
     }
     #[test]
+    fn d_proof_for_conjunction() {
+        let a = ObjVar::with_name(0, Types::Boolean, "A");
+        let b = ObjVar::with_name(1, Types::Boolean, "B");
+        let a_term = Term::var(&a);
+        let b_term = Term::var(&b);
+        let b_form = Formula::atom(&b_term).unwrap();
+        let a_form = Formula::atom(&a_term).unwrap();
+        let proof = d_proof(&and(&a_form,&b_form)).unwrap();
+        println!("{}", proof.formula());
+        assert!(prop_d(proof.formula()));
+    }
+    #[test]
+    fn g_proof_for_conjunction() {
+        let a = ObjVar::with_name(0, Types::Boolean, "A");
+        let b = ObjVar::with_name(1, Types::Boolean, "B");
+        let a_term = Term::var(&a);
+        let b_term = Term::var(&b);
+        let b_form = Formula::atom(&b_term).unwrap();
+        let a_form = Formula::atom(&a_term).unwrap();
+        let proof = g_proof(&and(&a_form,&b_form)).unwrap();
+        println!("{}", proof.formula());
+        assert!(prop_g(proof.formula()));
+    }
+    #[test]
+    fn i_proof_for_conjunction() {
+        let a = ObjVar::with_name(0, Types::Boolean, "A");
+        let b = ObjVar::with_name(1, Types::Boolean, "B");
+        let a_term = Term::var(&a);
+        let b_term = Term::var(&b);
+        let b_form = Formula::atom(&b_term).unwrap();
+        let a_form = Formula::atom(&a_term).unwrap();
+        let proof = i_proof(&and(&a_form,&b_form)).unwrap();
+        println!("{}", proof.formula());
+        assert!(prop_i(proof.formula()));
+    }
+    #[test]
     fn case_dist_for_atomic_formula() {
         let b = ObjVar::new(0, Types::Boolean);
         let x = ObjVar::with_name(1, Types::Boolean,"X");
@@ -973,6 +1235,18 @@ mod tests {
         let b_form = Formula::Atom(Term::var(&b));
         let x_form = Formula::Atom(Term::var(&x));
         let stable_proof = case_dist(&imp(&a_form,&b_form),&x_form).unwrap();
+        println!("{}", stable_proof.formula());
+        assert_eq!(stable_proof.free_assumptions(), HashSet::new());
+    }
+    #[test]
+    fn case_dist_for_conjunction() {
+        let a = ObjVar::with_name(0, Types::Boolean, "A");
+        let b = ObjVar::with_name(1, Types::Boolean, "B");
+        let x = ObjVar::with_name(2, Types::Boolean,"X");
+        let a_form = Formula::Atom(Term::var(&a));
+        let b_form = Formula::Atom(Term::var(&b));
+        let x_form = Formula::Atom(Term::var(&x));
+        let stable_proof = case_dist(&and(&a_form,&b_form),&x_form).unwrap();
         println!("{}", stable_proof.formula());
         assert_eq!(stable_proof.free_assumptions(), HashSet::new());
     }
