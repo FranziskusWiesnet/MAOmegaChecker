@@ -49,7 +49,7 @@ In $\mathtt{term}$_$\mathtt{kind.rs}$, term kinds are first defined recursively 
 Term kinds consist of constants, variables, the application of two term kinds, or the abstraction of a variable from a term kind
 For term kinds, it does not matter whether everything is well-typed.
 
-(Typed) terms are then defined in $\mathtt{typed}$_$\mathtt{terms.rs}$.
+(Typed) terms are then defined in $\mathtt{typed}$ $\mathtt{terms.rs}$.
 They are represented by a struct consisting of a term kind and a type.
 The individual components of the Term struct are private, so that terms can only be introduced through the methods provided in $\mathtt{typed}$_$\mathtt{terms.rs}$.
 
