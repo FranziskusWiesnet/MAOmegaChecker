@@ -100,6 +100,7 @@ fn main() {
     let T = imp(&imp(&AllQx, &bot), &bot);
     let StoT = imp(&S, &T);
 
+
     println!("{StoT}");
     println!("{:?}", d_proof(&StoT));
     let B = imp(&imp(&qx_form, &bot), &bot);

@@ -16,13 +16,92 @@ The project is currently under development. I am very grateful for any comments 
 ## Approach to the $\mathsf{MA}^\omega$-Checker
 
 ### Types
-To be added.
+
+Types are defined in $\texttt{types.rs}$.
+In the implementation, types are represented by an enum.
+In shorthand notation, types $\tau, \rho$ can be defined syntactically as follows:
+$$
+\tau, \rho ::= \xi \mid \mathbb{B} \mid \mathbb{N} \mid \mathbb{L}(\tau) \mid \tau \to \rho  \mid \tau \times \rho.
+$$
+Here, $\xi$ denotes a type variable.
+In the theory $\mathsf{MA}^\omega$, there are infinitely many type variables.
+In the implementation, a type variable is represented by a $\texttt{usize}$.
+
 ### Terms
-To be added.
+
+Terms in $\mathsf{MA}^\omega$ always come with a type.
+Terms are formed from variables, constants, abstraction, and application.
+In our implementation, terms are defined in the $\texttt{terms}$ folder.
+#### Termvariables
+Term variables, also called object variables, are defined as a struct in $\texttt{obj_var.rs}$.
+An object variable is given by its ID, a $\texttt{usize}$, and its type.
+Optionally, one can also give the variable a name, a $\texttt{String}$, in order to obtain more readable output.
+Two variables are equal if their ID and type agree. The name is irrelevant.
+
+#### Constants
+Constants are initially syntactic expressions and are represented by an $\texttt{enum}$, given in $\texttt{consts.rs}$.
+Typical constants are 0, the successor, the case operator, and the recursion operators over natural numbers or lists.
+Some constants take types as parameters. The method $\texttt{ty}$ returns the type of a constant.
+
+#### Recursive definition of terms
+In $\texttt{term_kind.rs}$, term kinds are first defined recursively as syntactic objects by an $\texttt{enum}$.
+Term kinds consist of constants, variables, the application of two term kinds, or the abstraction of a variable from a term kind
+For term kinds, it does not matter whether everything is well-typed.
+
+(Typed) terms are then defined in $\texttt{typed_terms.rs}$.
+They are represented by a struct consisting of a term kind and a type.
+The individual components of the Term struct are private, so that terms can only be introduced through the methods provided in $\texttt{typed_terms.rs}$.
+
+Equality of term kinds, and hence also of terms, is defined in such a way that it also captures $\alpha$-equivalence.
+The idea behind this definition goes back to [4].
+
 ### Formulas
-To be added.
+Formulas are represented as an $\texttt{enum}$ in $\texttt{formula.rs}$.
+There are atomic formulas, which are given by a term,
+implication, conjunction, universal quantification, and the symbol $\bot$.
+It should be noted here that, in the theory $\mathsf{MA}^\omega$, the term occurring in an atomic formula must have type Bool.
+In the implementation, however, the type of the corresponding term is not checked at first.
+Since Formula is a public $\texttt{enum}$, the user can turn any term into an atomic formula.
+The user should therefore take care when using it.
+However, the method $\texttt{atom}$ first checks whether the term is Boolean and returns a type error otherwise.
+
 ### Proofs
-To be added.
+Proofs are structured similarly to terms. Formulas play for proofs the role that types play for terms.
+The folder $\texttt{proofs}$, in which proofs are defined, therefore has a structure similar to the folder $\texttt{terms}$.
+
+#### Assumptions
+
+Assumptions are represented as a $\texttt{struct}$ in assumptions.rs.
+They consist of an ID, given by a $\texttt{usize}$, a formula, and an optional name as a $\texttt{String}$.
+Equality of assumptions is determined by the ID and the formula. The name is irrelevant for equality.
+
+#### Axioms
+Axioms are given as an $\texttt{enum}$.
+These include the axiom $\mathsf{Truth}$, $\bot^+$, case distinction, and recursion.
+Case distinction and recursion each take an object variable and a formula as arguments.
+For case distinction, the object variable must have Boolean type,
+while for recursion it must have either the type of natural numbers or a list type.
+This can be seen from the method $\texttt{form}$,
+which returns the formula corresponding to the given axiom,
+or a type error if the above conditions are not satisfied.
+
+#### Recursive definition of proofs
+As with terms, we first define proof kinds recursively as syntactic objects by means of an $\texttt{enum}$ in $\texttt{proof_kind.rs}$.
+Proof kinds consist of assumptions, axioms, two kinds of application of two proof kinds to each other 
+(once for conjunction introduction and once for implication elimination)
+the abstraction of an assumption from a proof kind,
+the abstraction of an object variable from a proof kind,
+the application of a term to a proof kind,
+and two forms of conjunction elimination applied to a proof kind.
+In the case of proof kinds, the formula does not yet play a role.
+
+Proofs themselves are then given in $\texttt{checked_proofs.rs}$ as a $\texttt{struct}$ consisting of a proof kind and the corresponding formula.
+Since the fields of $\texttt{Proof}$ are private, outside of the defining module instances can only be created through public constructor functions that enforce the correctness conditions.
+In addition to the standard functions, the function efq is particularly worth mentioning: it takes a formula $A$ and returns a proof of $\mathsf{atom}(\mathsf{ff}) \to A$.
+
+### Substitution
+
+## Definite, Goal, Relevant and Irrelevant Formulas
 
 ## References 
 [1] Trifon Trifonov, *Analysis of Methods for Extraction of Programs from Non-Constructive Proofs*, PhD thesis, Ludwig Maximilian University of Munich, 2012. DOI: [10.5282/EDOC.14030](https://doi.org/10.5282/edoc.14030). 

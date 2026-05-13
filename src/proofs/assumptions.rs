@@ -3,7 +3,6 @@ use std::fmt;
 use crate::formulas::Formula;
 use crate::terms::{ObjVar, TermSubstitution};
 use crate::types::{TypeError, TypeSubstitution};
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ProofAssumption {
     id: usize,
@@ -32,7 +31,6 @@ impl ProofAssumption {
             name: self.name.clone(),
         }
     }
-
     pub fn subst(&self, sigma: &TermSubstitution) -> Result<Self, TypeError> {
         Ok(Self {
             id: self.id,
@@ -91,7 +89,6 @@ pub fn assumption_map_for_term_subst(used_assumption: &HashSet<ProofAssumption>,
     }
     Ok(rho)
 }
-
 pub fn assumption_map_for_bot_subst(used_assumption: &HashSet<ProofAssumption>,
                                     formula: &Formula)
                                     -> HashMap<ProofAssumption, ProofAssumption> {

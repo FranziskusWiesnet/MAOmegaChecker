@@ -15,7 +15,6 @@ fn and(a: &Formula, b: &Formula) -> Formula {
 fn all(x: &ObjVar, a: &Formula) -> Formula {
     Formula::Forall(x.clone(), Box::new(a.clone()))
 }
-
 fn F() -> Formula {
     Formula::falsum()
 }
@@ -64,7 +63,6 @@ fn axiom(axiom: Axiom) -> Option<Proof> {
         Err(_) => None
     }
 }
-
 fn r_prop_to_d_prop(formula: &Formula) -> Option<Proof> {
     // To prove: ((¬A^F → ⊥) → A) → A^F → A
     let u = ProofAssumption::new(0, imp(&formula.F(), &F()));
@@ -1069,7 +1067,6 @@ pub fn i_proof(formula: &Formula) -> Option<Proof>{
         }
     }
 }
-
 pub fn prop_d (formula: &Formula) -> bool {
     match formula {
         Formula::Imp(a, b) => {
@@ -1078,7 +1075,6 @@ pub fn prop_d (formula: &Formula) -> bool {
         _ => false,
     }
 }
-
 pub fn prop_g (formula: &Formula) -> bool {
     match formula {
         Formula::Imp(a,b) => {
@@ -1103,9 +1099,7 @@ pub fn prop_i (formula: &Formula) -> bool {
         _ => false,
     }
 }
-
 #[cfg(test)]
-
 mod tests {
     use std::collections::HashSet;
     use crate::terms::Term;
@@ -1249,5 +1243,20 @@ mod tests {
         let stable_proof = case_dist(&and(&a_form,&b_form),&x_form).unwrap();
         println!("{}", stable_proof.formula());
         assert_eq!(stable_proof.free_assumptions(), HashSet::new());
+    }
+    #[test]
+    fn proof_search_with_d_prop(){
+        let a_var = ObjVar::with_name(0,  Types::Boolean,"A");
+        let b_var = ObjVar::with_name(0, Types::Boolean,"B");
+        let c_var = ObjVar::with_name(0, Types::Boolean,"C");
+
+        let a = Formula::Atom(Term::var(&a_var));
+        let b = Formula::Atom(Term::var(&b_var));
+        let c = Formula::Atom(Term::var(&c_var));
+
+        let form = imp(&imp(&a,&imp(&b,&c)),&imp(&imp(&a,&b),&imp(&a,&c)));
+        // form: (A → B → C) → (A → B) → A → C
+        println!("{}", form);
+        println!("{:?}",d_proof(&imp(&Formula::Bottom,&form)));
     }
 }

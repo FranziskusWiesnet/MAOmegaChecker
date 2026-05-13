@@ -14,8 +14,6 @@ pub enum Formula {
     Forall(ObjVar, Box<Formula>),
     Bottom,
 }
-
-
 impl fmt::Display for Formula {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -47,7 +45,6 @@ impl Formula {
     }
     pub fn falsum() -> Self { Formula::Atom(Term::constant(Const::FF)) }
     pub fn verum() -> Self { Formula::Atom(Term::constant(Const::TT)) }
-
     pub fn F(&self) -> Self {
         match self {
             Formula::Bottom => Formula::falsum(),
@@ -169,7 +166,6 @@ impl Formula {
         }
     }
 }
-
 impl Formula {
     pub fn subst_type_with_map(&self,
                                sigma: &TypeSubstitution,
@@ -197,7 +193,6 @@ impl Formula {
             Formula::Bottom => Formula::Bottom,
         }
     }
-
     pub fn subst_type(&self, sigma: &TypeSubstitution) -> Formula {
         match self {
             Formula::Atom(t) => Formula::Atom(t.subst_type(sigma)),
@@ -242,7 +237,6 @@ impl Formula {
                     let t = b.subst(sigma)?;
                     Ok(Formula::and(s,t))
                 }
-
             Formula::Forall(var, body) => {
                 let mut sigma_wo_var = sigma.clone();
                 sigma_wo_var.remove(var);
@@ -269,7 +263,6 @@ impl Formula {
         }
     }
 }
-
 impl PartialEq for Formula {
     fn eq(&self, other: &Formula) -> bool {
         match (self,other) {
@@ -339,7 +332,6 @@ impl Formula {
         }
     }
 }
-
 impl Formula {
     pub(crate) fn kernel(&self) -> Formula {
         match self {
@@ -351,8 +343,6 @@ impl Formula {
         }
     }
 }
-
-
 pub fn is_qfree(formula: &Formula) -> bool {
     match formula {
         Formula::Bottom => true,
@@ -362,19 +352,16 @@ pub fn is_qfree(formula: &Formula) -> bool {
         Formula::And (g, h)  => is_qfree(&g) && is_qfree(&h),
     }
 }
-
 pub fn Stab(formula: &Formula) -> Formula {
     let F = Formula::Atom(Term::ff());
     imp(&imp(&imp(formula,&F),&F),formula)
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::{HashMap,HashSet};
     use crate::terms::{ObjVar, Term};
     use crate::types::Types;
-
     #[test]
     fn free_type_vars_collects_from_atoms_implications_and_binders() {
         // type variables: 1, 2, 3

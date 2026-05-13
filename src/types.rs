@@ -112,7 +112,6 @@ impl fmt::Display for TypeError {
 mod tests {
     use super::*;
     use std::collections::HashSet;
-
     #[test]
     fn new_type_var_empty_set() {
         let h = HashSet::new();
@@ -182,7 +181,6 @@ mod tests {
                 Box::new(Types::Nat),
             )),
         );
-
         assert_eq!(ty.subst(&sigma), expected);
     }
 }

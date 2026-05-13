@@ -96,8 +96,6 @@ impl Term {
     pub fn bounded_vars(&self) -> HashSet<ObjVar> {self.kind.bounded_vars()}
     pub fn used_var_names(&self) -> HashSet<ObjVar> {self.kind.used_var_names()}
 }
-
-
 pub fn check_term_substitution(sigma: &TermSubstitution) -> Result<(), TypeError> {
     for (v, t) in sigma {
         if v.ty() != t.ty() {

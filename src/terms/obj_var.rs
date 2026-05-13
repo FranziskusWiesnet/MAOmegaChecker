@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use crate::types::{TypeSubstitution, Types};
-
 #[derive(Debug, Clone)]
 pub struct ObjVar {
     id: usize,
