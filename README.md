@@ -34,7 +34,7 @@ Terms are formed from variables, constants, abstraction, and application.
 In our implementation, terms are defined in the $\texttt{terms}$ folder.
 
 #### Termvariables
-Term variables, also called object variables, are defined as a struct in $\texttt{obj}$ $\texttt{var.rs}$.
+Term variables, also called object variables, are defined as a struct in $\texttt{obj}\underline{ }\texttt{var.rs}$.
 An object variable is given by its ID, a $\texttt{usize}$, and its type.
 Optionally, one can also give the variable a name, a $\texttt{String}$, in order to obtain more readable output.
 Two variables are equal if their ID and type agree. The name is irrelevant.
@@ -49,7 +49,7 @@ In $\mathtt{term}$_$\mathtt{kind.rs}$, term kinds are first defined recursively 
 Term kinds consist of constants, variables, the application of two term kinds, or the abstraction of a variable from a term kind
 For term kinds, it does not matter whether everything is well-typed.
 
-(Typed) terms are then defined in $\mathtt{typed}$ $\mathtt{terms.rs}$.
+(Typed) terms are then defined in $\mathtt{typed}\underline{ }\mathtt{terms.rs}$.
 They are represented by a struct consisting of a term kind and a type.
 The individual components of the Term struct are private, so that terms can only be introduced through the methods provided in $\mathtt{typed}$_$\mathtt{terms.rs}$.
 
@@ -87,7 +87,7 @@ which returns the formula corresponding to the given axiom,
 or a type error if the above conditions are not satisfied.
 
 #### Recursive definition of proofs
-As with terms, we first define proof kinds recursively as syntactic objects by means of an $\texttt{enum}$ in $\mathtt{proof}$_$\mathtt{kind.rs}$.
+As with terms, we first define proof kinds recursively as syntactic objects by means of an $\texttt{enum}$ in $\mathtt{proof}\underline{ }\mathtt{kind.rs}$.
 Proof kinds consist of assumptions, axioms, two kinds of application of two proof kinds to each other 
 (once for conjunction introduction and once for implication elimination)
 the abstraction of an assumption from a proof kind,
