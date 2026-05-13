@@ -20,7 +20,9 @@ The project is currently under development. I am very grateful for any comments 
 Types are defined in $\texttt{types.rs}$.
 In the implementation, types are represented by an enum.
 In shorthand notation, types $\tau, \rho$ can be defined syntactically as follows:
+
 $$\tau,\rho ::= \xi \mid \mathbb{B} \mid \mathbb{N} \mid \mathbb{L}(\tau) \mid \tau \to \rho  \mid \tau \times \rho.$$
+
 Here, $\xi$ denotes a type variable.
 In the theory $\mathsf{MA}^\omega$, there are infinitely many type variables.
 In the implementation, a type variable is represented by a $\texttt{usize}$.
@@ -31,7 +33,7 @@ Terms in $\mathsf{MA}^\omega$ always come with a type.
 Terms are formed from variables, constants, abstraction, and application.
 In our implementation, terms are defined in the $\texttt{terms}$ folder.
 #### Termvariables
-Term variables, also called object variables, are defined as a struct in $\mathtt{obj}$_$\mathtt{var.rs}$.
+Term variables, also called object variables, are defined as a struct in $\texttt{obj}$_$\texttt{var.rs}$.
 An object variable is given by its ID, a $\texttt{usize}$, and its type.
 Optionally, one can also give the variable a name, a $\texttt{String}$, in order to obtain more readable output.
 Two variables are equal if their ID and type agree. The name is irrelevant.
