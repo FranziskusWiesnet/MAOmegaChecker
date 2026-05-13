@@ -33,7 +33,7 @@ Terms in $\mathsf{MA}^\omega$ always come with a type.
 Terms are formed from variables, constants, abstraction, and application.
 In our implementation, terms are defined in the $\texttt{terms}$ folder.
 #### Termvariables
-Term variables, also called object variables, are defined as a struct in $\mathtt{obj\_var.rs}$.
+Term variables, also called object variables, are defined as a struct in $\mathtt{obj{\_}var.rs}$.
 An object variable is given by its ID, a $\texttt{usize}$, and its type.
 Optionally, one can also give the variable a name, a $\texttt{String}$, in order to obtain more readable output.
 Two variables are equal if their ID and type agree. The name is irrelevant.
