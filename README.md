@@ -102,14 +102,17 @@ In addition to the standard functions, the function efq is particularly worth me
 
 ### Substitution
 
-## Definite, Goal, Relevant and Irrelevant Formulas
-
+## Definite ($\mathcal{D}$), Goal ($\mathcal{G}$), Relevant ($\mathcal{R}$) and Irrelevant ($\mathcal{I}$) Formulas
+$$D^\textbf{F} \to D$$
+$$G\to (G^\textbf{F} \to \bot) \to \bot$$
+$$(\neg R^\textbf{F} \to \bot) \to R$$
+$$I \to I^\textbf{F}$$
 ## References 
 [1] Trifon Trifonov, *Analysis of Methods for Extraction of Programs from Non-Constructive Proofs*, PhD thesis, Ludwig Maximilian University of Munich, 2012. DOI: [10.5282/EDOC.14030](https://doi.org/10.5282/edoc.14030). 
 
 [2] Helmut Schwichtenberg and Stanley S. Wainer, *Proofs and Computations*, Cambridge University Press, 2012. DOI: [10.1017/CBO9781139031905](
    https://doi.org/10.1017/CBO9781139031905).
 
-[3] Ulrich Berger, Wilfried Buchholz, and Helmut Schwichtenberg, “Refined program extraction from classical proofs,” *Annals of Pure and Applied Logic* 114(1–3), 3–25, 2002. DOI: [10.1016/S0168-0072(01)00073-2](https://doi.org/10.1016/S0168-0072(01)00073-2).
+[3] Ulrich Berger, Wilfried Buchholz, and Helmut Schwichtenberg, “Refined program extraction from classical proofs”, *Annals of Pure and Applied Logic* 114(1–3), 3–25, 2002. DOI: [10.1016/S0168-0072(01)00073-2](https://doi.org/10.1016/S0168-0072(01)00073-2).
 
 [4] Nicolaas Govert de Bruijn, “Lambda calculus notation with nameless dummies, a tool for automatic formula manipulation, with application to the Church-Rosser theorem,” *Indagationes Mathematicae (Proceedings)* 75(5), 381–392, 1972. DOI: [10.1016/1385-7258(72)90034-0](https://doi.org/10.1016/1385-7258(72)90034-0).

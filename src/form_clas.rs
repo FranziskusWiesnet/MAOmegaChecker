@@ -2,6 +2,7 @@ use std::collections::{HashMap};
 use crate::formulas::Formula;
 use crate::proofs::axioms::Axiom;
 use crate::proofs::checked_proofs::{Proof};
+use crate::proofs::proof_kind::ProofError::Type;
 use crate::proofs::ProofAssumption;
 use crate::terms::{ObjVar, Term, TermSubstitution};
 use crate::types::Types;
@@ -681,7 +682,22 @@ pub fn g_proof(formula: &Formula) -> Option<Proof> {
                                         all_elim( // A
                                             ass(&u), // ∀x.A
                                             x_term)?)?)?)?))) // x
-            } else {
+            } else if *x.ty() == Types::Boolean {
+                let sigma_tt : TermSubstitution = HashMap::from([(x.clone(),Term::tt())]);
+                let sigma_ff: TermSubstitution = HashMap::from([(x.clone(),Term::ff())]);
+                if let (Ok(a_tt),Ok(a_ff)) =
+                    (body.subst(&sigma_tt),body.subst(&sigma_ff)) {
+                    if let (Some(m),Some(n)) =
+                        (g_proof(&a_tt),g_proof(&a_ff)) {
+                        // m : A(tt) → (A(tt)^F → ⊥) → ⊥
+                        // n : A(ff) → (A(ff)^F → ⊥) → ⊥
+                        todo!();
+                        return None
+                    }
+                }
+                None
+            }
+            else {
                 None
             }
         }
