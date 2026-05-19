@@ -2,7 +2,6 @@ use std::collections::{HashMap};
 use crate::formulas::Formula;
 use crate::proofs::axioms::Axiom;
 use crate::proofs::checked_proofs::{Proof};
-use crate::proofs::proof_kind::ProofError::Type;
 use crate::proofs::ProofAssumption;
 use crate::terms::{ObjVar, Term, TermSubstitution};
 use crate::types::Types;
@@ -349,12 +348,10 @@ pub fn case_dist(formula: &Formula, goal: &Formula) -> Option<Proof> {
                 let sigma_ff: TermSubstitution = HashMap::from([(var.clone(),Term::ff())]);
                 if let (Ok(a_tt),Ok(a_ff)) =
                     (a.subst(&sigma_tt),a.subst(&sigma_ff)) {
-                    if let (Some(m0),Some(m1),Some(n)) =
+                    if let (Some(m),Some(n)) =
                         (case_dist(&a_tt,&imp(&a_ff,goal)),
-                         case_dist(&a_tt,&imp(&imp(&a_ff,&F()),goal)),
                          case_dist(&a_ff,goal)) {
-                        // m0 :  (A(tt) → A(ff) → goal) → (¬A(tt) → A(ff) → goal) → A(ff) → goal
-                        // m1 :  (A(tt) → ¬A(ff) → goal) → (¬A(tt) → ¬A(ff) → goal) → ¬A(ff) → goal
+                        // m :  (A(tt) → A(ff) → goal) → (¬A(tt) → A(ff) → goal) → A(ff) → goal
                         // n :  (A(ff) → goal) → (¬A(ff) → goal) → goal
                         let ax_case = axiom(Axiom::Case(var.clone(), a.as_ref().clone()))?;
                         // ax_case : ∀ var. ((A(tt) → A(ff) → A(var))
@@ -374,7 +371,7 @@ pub fn case_dist(formula: &Formula, goal: &Formula) -> Option<Proof> {
                         // u11 : ¬A(ff)
                         let w = ProofAssumption::new(6, all(&var, a));
                         // w : ∀ var.A(var)
-                        let proof00  =
+                        let proof0 =
                             imp_intro( // A(tt) → A(ff) → goal
                                 &u00, // A(tt)
                                 imp_intro( // A(ff) → goal
@@ -390,7 +387,7 @@ pub fn case_dist(formula: &Formula, goal: &Formula) -> Option<Proof> {
                                                         Term::var(var))?, // var
                                                     ass(&u00))?, // A(tt)
                                                 ass(&u01))?)?)?)); // A(ff)
-                        let proof10 =
+                        let proof1 =
                             imp_intro( // ¬A(tt) → A(ff) → goal
                                 &u10, // ¬A(tt)
                                 imp_intro( // A(ff) → goal
@@ -404,34 +401,7 @@ pub fn case_dist(formula: &Formula, goal: &Formula) -> Option<Proof> {
                                                 all_elim( // A(tt)
                                                     ass(&w), // ∀ var.A(var)
                                                     Term::tt())?)?))?)); // tt
-                        let proof11 =
-                            imp_intro( // ¬A(tt) → ¬A(ff) → goal
-                                &u10, // ¬A(tt)
-                                imp_intro( // ¬A(ff) → goal
-                                    &u11, // ¬A(ff)
-                                    imp_elim( //goal
-                                        ass(&v), // ¬(∀ var.A(var)) → goal
-                                        imp_intro( // ¬ ∀ var.A(var)
-                                            &w, // ∀ var.A(var)
-                                            imp_elim( // F
-                                                ass(&u10), // ¬A(tt)
-                                                all_elim( // A(tt)
-                                                    ass(&w), // ∀ var.A(var)
-                                                    Term::tt())?)?))?)); // tt
-                        let proof01 =
-                            imp_intro( // A(tt) → ¬A(ff) → goal
-                                &u00, // A(tt)
-                                imp_intro( // ¬A(ff) → goal
-                                    &u11, // ¬A(ff)
-                                    imp_elim( //goal
-                                        ass(&v), // ¬(∀ var.A(var)) → goal
-                                        imp_intro( // ¬ ∀ var.A(var)
-                                            &w, // ∀ var.A(var)
-                                            imp_elim( // F
-                                                ass(&u11), // ¬A(ff)
-                                                all_elim( // A(ff)
-                                                    ass(&w), // ∀ var.A(var)
-                                                    Term::ff())?)?))?)); // ff
+
                         return
                             Some(
                                 imp_intro( // (∀ var.A(var) → goal) → (¬(∀ var.A(var)) → goal) → goal
@@ -443,14 +413,20 @@ pub fn case_dist(formula: &Formula, goal: &Formula) -> Option<Proof> {
                                                 n, // (A(ff) → goal) → (¬A(ff) → goal) → goal
                                                 imp_elim( // A(ff) → goal
                                                     imp_elim( // (¬A(tt) → A(ff) → goal) → A(ff) → goal
-                                                        m0, // (A(tt) → A(ff) → goal) → (¬A(tt) → A(ff) → goal) → A(ff) → goal
-                                                        proof00)?, // A(tt) → A(ff) → goal
-                                                    proof10)?)?, // ¬A(tt) → A(ff) → goal
-                                            imp_elim( // ¬A(ff) → goal
-                                                imp_elim( // (¬A(tt) → ¬A(ff) → goal) → ¬A(ff) → goal
-                                                    m1, // (A(tt) → ¬A(ff) → goal) → (¬A(tt) → ¬A(ff) → goal) → ¬A(ff) → goal
-                                                    proof01)?, // A(tt) → ¬A(ff) → goal
-                                                proof11)?)?))) // ¬A(tt) → ¬A(ff) → goal
+                                                        m, // (A(tt) → A(ff) → goal) → (¬A(tt) → A(ff) → goal) → A(ff) → goal
+                                                        proof0)?, // A(tt) → A(ff) → goal
+                                                    proof1)?)?, // ¬A(tt) → A(ff) → goal
+                                            imp_intro( // ¬A(ff) → goal
+                                                &u11, // ¬A(ff)
+                                                imp_elim( // goal
+                                                    ass(&v), // ¬(∀ var.A(var)) → goal
+                                                    imp_intro( // ¬(∀ var.A(var))
+                                                        &w, // ∀ var.A(var)
+                                                        imp_elim( // F
+                                                            ass(&u11), // ¬A(ff)
+                                                            all_elim( // A(ff)
+                                                                ass(&w), // ∀ var.A(var)
+                                                                Term::ff())?)?))?))?))) // ff
                     }
                 }
             }
@@ -660,12 +636,12 @@ pub fn g_proof(formula: &Formula) -> Option<Proof> {
             // Case ∀x.A
             if let Some(m) = i_proof(body) {
                 // m : A → A^F
-                let u = ProofAssumption::new(0, all(x, formula));
+                let u = ProofAssumption::new(0, all(x, body));
                 // u : ∀x.A
                 let x_term = Term::var(x);
                 let v =
                     ProofAssumption::new(1, imp(
-                        &all(&x,&formula.F()),
+                        &all(&x,&body.F()),
                         &Formula::Bottom));
                 // v : ∀x.A^F → ⊥
                 Some(
@@ -691,15 +667,55 @@ pub fn g_proof(formula: &Formula) -> Option<Proof> {
                         (g_proof(&a_tt),g_proof(&a_ff)) {
                         // m : A(tt) → (A(tt)^F → ⊥) → ⊥
                         // n : A(ff) → (A(ff)^F → ⊥) → ⊥
-                        todo!();
-                        return None
-                    }
-                }
-                None
+                        let u = ProofAssumption::new(0, all(x, body));
+                        // u : ∀x.A
+                        let v =
+                            ProofAssumption::new(1, imp(
+                                &all(&x,&body.F()),
+                                &Formula::Bottom));
+                        // v : ∀x.A^F → ⊥
+                        let ax_case = axiom(Axiom::Case(x.clone(), body.F()))?;
+                        // ax_case : ∀ x. ((A(tt)^F → A(ff)^F → A^F)
+                        let w = ProofAssumption::new(2, a_tt.F());
+                        // w : A(tt)^F
+                        let z = ProofAssumption::new(3, a_ff.F());
+                        // z : A(ff)^F
+                        Some(
+                            imp_intro( // ∀x.A → (∀x.A^F → ⊥) → ⊥
+                                &u, // ∀x.A
+                                imp_intro( // (∀x.A^F → ⊥) → ⊥
+                                    &v, // ∀x.A^F → ⊥
+                                    imp_elim( // ⊥
+                                        imp_elim( // (A(tt)^F → ⊥) → ⊥
+                                            m, // A(tt) → (A(tt)^F → ⊥) → ⊥
+                                            all_elim( // A(tt)
+                                                ass(&u), // u : ∀x.A
+                                                Term::tt())?)?, // tt
+                                        imp_intro( //A(tt)^F → ⊥
+                                            &w, // A(tt)^F
+                                            imp_elim( // ⊥
+                                                imp_elim( // (A(ff)^F → ⊥) → ⊥
+                                                    n, // A(ff) → (A(ff)^F → ⊥) → ⊥
+                                                    all_elim( // A(ff)
+                                                        ass(&u), // u : ∀x.A
+                                                        Term::ff())?)?, // ff
+                                                imp_intro( // A(tt)^F → ⊥
+                                                    &z, // A(ff)^F
+                                                    imp_elim(
+                                                        ass(&v), // ∀x.A^F → ⊥
+                                                        all_intro( // ∀x.A^F
+                                                            x, // x
+                                                            imp_elim( // A^F
+                                                                imp_elim( // A(ff)^F → A^F
+                                                                    all_elim( //A(tt)^F → A(ff)^F → A^F
+                                                                        ax_case, // ∀ x. ((A(tt)^F → A(ff)^F → A^F)
+                                                                        Term::var(x))?, // x
+                                                                    ass(&w))?, // A(tt)^F
+                                                                ass(&z))?)?)?))?))?))) // A(ff)^F
+                    } else {None}
+                } else {None}
             }
-            else {
-                None
-            }
+            else {None}
         }
         Formula::Imp(a, b) => {
             // Case A → B
@@ -724,33 +740,33 @@ pub fn g_proof(formula: &Formula) -> Option<Proof> {
                 // x : ¬A^F
                 let proof1 =
                     imp_intro( // A → ⊥
-                               &s, // A
-                               imp_elim( // ⊥
-                                         imp_elim( // (B^F → ⊥) → ⊥
-                                                   n, // B → (B^F → ⊥) → ⊥
-                                                   imp_elim( // B
-                                                             ass(&u), // A → B
-                                                             ass(&s))?)?, // A
-                                         imp_intro( // B^F → ⊥
-                                                    &z, // B^F
-                                                    imp_elim( // ⊥
-                                                              ass(&v), // (A^F → B^F) → ⊥
-                                                              imp_intro( // A^F → B^F
-                                                                         &w, // A^F
-                                                                         ass(&z)))?))?); // B^F
+                        &s, // A
+                        imp_elim( // ⊥
+                            imp_elim( // (B^F → ⊥) → ⊥
+                                n, // B → (B^F → ⊥) → ⊥
+                                imp_elim( // B
+                                    ass(&u), // A → B
+                                    ass(&s))?)?, // A
+                            imp_intro( // B^F → ⊥
+                                &z, // B^F
+                                imp_elim( // ⊥
+                                    ass(&v), // (A^F → B^F) → ⊥
+                                    imp_intro( // A^F → B^F
+                                        &w, // A^F
+                                        ass(&z)))?))?); // B^F
                 let proof2 =
-                imp_intro( // ¬A^F → ⊥
-                    &x, // ¬A^F
-                imp_elim( // ⊥
-                    ass(&v), // (A^F → B^F) → ⊥
-                imp_intro( //A^F → B^F
-                    &w, //A^F
-                    imp_elim( // B^F
-                              Proof::efq(&b.F()), // F → B^F
-                              imp_elim( // F
+                    imp_intro( // ¬A^F → ⊥
+                        &x, // ¬A^F
+                        imp_elim( // ⊥
+                            ass(&v), // (A^F → B^F) → ⊥
+                            imp_intro( //A^F → B^F
+                                &w, //A^F
+                                imp_elim( // B^F
+                                    Proof::efq(&b.F()), // F → B^F
+                                    imp_elim( // F
                                         ass(&x), // ¬A^F
                                         ass(&w), // A^F
-                              )?)?))?);
+                                    )?)?))?);
                 Some(
                     imp_intro( // (A → B) → ((A^F → B^F) → ⊥) → ⊥
                         &u,  // A → B

@@ -97,7 +97,7 @@ and two forms of conjunction elimination applied to a proof kind.
 In the case of proof kinds, the formula does not yet play a role.
 
 Proofs themselves are then given in $\mathtt{checked}\underline{ }\mathtt{proofs.rs}$ as a $\texttt{struct}$ consisting of a proof kind and the corresponding formula.
-Since the fields of $\texttt{Proof}$ are private, outside of the defining module instances can only be created through public constructor functions that enforce the correctness conditions.
+Since the fields of $\texttt{Proof}$ are private, outside the defining module instances can only be created through public constructor functions that enforce the correctness conditions.
 In addition to the standard functions, the function efq is particularly worth mentioning: it takes a formula $A$ and returns a proof of $\mathsf{atom}(\mathsf{ff}) \to A$.
 
 ### Substitution
