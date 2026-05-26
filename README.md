@@ -7,10 +7,11 @@ It is a part of my project “Material Interpretation” ([10.55776/ESP576](http
 
 The proof checker was written to address an open problem, namely the characterization of all formulas in
 $\mathsf{MA}^\omega$ for which $D^{\mathbf{F}}\to D$ is provable. The goal would be to transform a description of these formulas into a proof, and vice versa.
-A major partial success would already be an extension of this class of formulas $\mathcal{D}$, as described for example in [1,2].
-In particular, this open question arose in the context of Friedman’s A-translation and is discussed in particular in Section 7.3.1 of [2].
+In particular, this open question arose in the context of the refined A-translation and is discussed in particular in Section 7.3.1 of [2].
+As shown in~[5], this problem has turned out to be unsolvable.
 A detailed presentation of the theory MA and the A-translation is given in particular in [1].
 The Rust programming language was chosen to explore how well Rust is suited as a programming language for proofs.
+A first evaluation of this can also be found in [5, Section 5].
 The project is currently under development. I am very grateful for any comments or suggestions for improvement.
 
 ## Approach to the $\mathsf{MA}^\omega$-Checker
@@ -146,17 +147,34 @@ they occur free in the formula being substituted. This is implemented in
 $\texttt{subst}\underline{ }\texttt{bot}$ in $\texttt{formula.rs}$.
 
 ## Definite ($\mathcal{D}$), Goal ($\mathcal{G}$), Relevant ($\mathcal{R}$) and Irrelevant ($\mathcal{I}$) Formulas
+The formula classes of definite, goal-relevant, and irrelevant formulas are
+defined in $\texttt{form}\underline{ }\texttt{clas.rs}$ by the functions $\texttt{d}\underline{ }\texttt{proof}$,
+$\texttt{g}\underline{ }\texttt{proof}$, $\texttt{r}\underline{ }\texttt{proof}$, and $\texttt{i}\underline{ }\texttt{proof}$.
 
-$$D^\textbf{F} \to D$$
-$$G\to (G^\textbf{F} \to \bot) \to \bot$$
-$$(\neg R^\textbf{F} \to \bot) \to R$$
-$$I \to I^\textbf{F}$$
+These functions each take a formula as input and return an
+$\texttt{Option}\langle\texttt{Proof}\rangle$. $\texttt{None}$ means that the input formula is not in
+the respective class; otherwise, a proof term of the property associated with that
+class is returned directly.
+
+For $D\in \mathcal{D}$, $G\in \mathcal{G}$, $R\in \mathcal{R}$ and $I\in\mathcal{I}$ the properties are
+$$D^\textbf{F} \to D,$$
+$$G\to (G^\textbf{F} \to \bot) \to \bot,$$
+$$(\neg R^\textbf{F} \to \bot) \to R\quad, \text{and}$$
+$$I \to I^\textbf{F}.$$
+
+The four formula classes are defined recursively according to the structure of
+formulas. However, they do not contain all formulas satisfying the corresponding
+properties. In [5], it is shown that the class of formulas satisfying this
+property cannot be specified recursively according to the structure of formulas.
+
 ## References 
 [1] Trifon Trifonov, *Analysis of Methods for Extraction of Programs from Non-Constructive Proofs*, PhD thesis, Ludwig Maximilian University of Munich, 2012. DOI: [10.5282/EDOC.14030](https://doi.org/10.5282/edoc.14030). 
 
-[2] Helmut Schwichtenberg and Stanley S. Wainer, *Proofs and Computations*, Cambridge University Press, 2012. DOI: [10.1017/CBO9781139031905](
-   https://doi.org/10.1017/CBO9781139031905).
+[2] Helmut Schwichtenberg and Stanley S. Wainer, *Proofs and Computations*, Cambridge University Press, 2012.
+DOI: [10.1017/CBO9781139031905](https://doi.org/10.1017/CBO9781139031905).
 
 [3] Ulrich Berger, Wilfried Buchholz, and Helmut Schwichtenberg, “Refined program extraction from classical proofs”, *Annals of Pure and Applied Logic* 114(1–3), 3–25, 2002. DOI: [10.1016/S0168-0072(01)00073-2](https://doi.org/10.1016/S0168-0072(01)00073-2).
 
 [4] Nicolaas Govert de Bruijn, “Lambda calculus notation with nameless dummies, a tool for automatic formula manipulation, with application to the Church-Rosser theorem,” *Indagationes Mathematicae (Proceedings)* 75(5), 381–392, 1972. DOI: [10.1016/1385-7258(72)90034-0](https://doi.org/10.1016/1385-7258(72)90034-0).
+
+[5] Franziskus Wiesnet, "On the Limits of Recursive Characterizations in the Refined $A$-Translation", arXiv preprint, [arXiv:2605.20452](https://arxiv.org/abs/2605.20452)
