@@ -102,7 +102,51 @@ In addition to the standard functions, the function efq is particularly worth me
 
 ### Substitution
 
+In proof assistants, substitution is a complex issue, since one has to be very careful to avoid variable collisions.
+In addition, there are different kinds of substitution. For example, if one performs
+the type substitution $\xi := \mathbb{B}$ in the term
+$f x^\xi y^{\mathbb{B}}$, one has to ensure that $x^\xi[\xi:=\mathbb{B}]$ becomes a new
+variable, i.e. does not become $y^{\mathbb{B}}$.
+
+There are substitutions for types, terms, and proof terms. In the theory
+$\mathsf{MA}^\omega$, there are no predicate variables. However, $\bot$ has the
+character of a predicate variable, since it can be replaced by formulas.
+
+A substitution is implemented as a hash map from variables to the corresponding
+expressions. The substitution is understood to be simultaneous. For example, $(fxy)[x:= y, y:= x] = fyx$.
+
+For types, only type variables can be substituted. This is implemented in
+\texttt{types.rs}. Since type variables do not occur bound in $MA^\omega$,
+one does not yet have to take possible variable collisions into account here.
+
+For terms, both type variables and object variables can be substituted. Both are
+implemented in $\texttt{term}\underline{ }\texttt{kind.rs}$. The replacement of object variables is implemented by the method
+$\texttt{subst}$. Here, one only has to ensure that bound variables are not substituted. This is
+done by removing the corresponding variable from the hash map when substituting
+the inner part of a lambda term. Things become somewhat more complex for the substitution of types in a term:
+here, the collision of object variables under type substitution described above
+can occur. For this reason, every object variable occurring in the term is first
+stored in a hash set. Then a hash map assigning fresh variables to these
+variables is created whenever the substitution changes their type. This hash map
+is then used to replace the variables in the term.
+
+For proof terms, the situation is similar to that for object terms. Here, however, there are substitutions of assumptions, terms, and types. These
+are implemented in $\texttt{proof}\underline{ }\texttt{kinds.rs}$ as $\texttt{subst}\underline{ }\texttt{assumption}$,
+$\texttt{subst}$, and $\texttt{subst}\underline{ }\texttt{type}$, respectively. When
+substituting assumption variables, one only has to ensure that bound assumptions
+are not replaced.  When substituting term variables, a corresponding hash map for
+the assumption variables that change has to be constructed. It becomes even more complex in the case of type substitution. In this case,
+both assumption variables and object variables may change. Therefore, before
+performing type substitution in a proof term, a hash map for the object variables
+and a hash map for the assumption variables are constructed.
+
+When substituting for $\bot$ by a formula, one again only has to ensure
+that bound variables in the original formula are replaced by other variables if
+they occur free in the formula being substituted. This is implemented in
+$\texttt{subst}\underline{ }\texttt{bot}$ in $\texttt{formula.rs}$.
+
 ## Definite ($\mathcal{D}$), Goal ($\mathcal{G}$), Relevant ($\mathcal{R}$) and Irrelevant ($\mathcal{I}$) Formulas
+
 $$D^\textbf{F} \to D$$
 $$G\to (G^\textbf{F} \to \bot) \to \bot$$
 $$(\neg R^\textbf{F} \to \bot) \to R$$
